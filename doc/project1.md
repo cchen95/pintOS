@@ -37,6 +37,9 @@ The list `sleeping_threads` is not thread-safe, but the timer device is the only
 #### Rationale
 
 We needed a way to keep track of when to wake up sleeping threads so we used a list to store them and another variable to keep track of the time left to sleep. Some alternative methods were to not use a sleeping threads list but to check if threads’ `sleep_ticks` > 0 but that would have a greater runtime of O(m) where m is the number of threads.
+
+**Space and time complexity**
+
 Time complexity = O(n), where n is the number of sleeping threads
 Space complexity = O(n)
 
@@ -131,9 +134,52 @@ We set lock priority to 0 when the lock is released. If other threads are alread
 ### Multi-level Feedback Queue Scheduler (MLFQS) 
 
 #### Data structures and functions
+
+* Modify `schedule()` for `thread_mlfqs` algorithm toggle
+* Add field `fixed_point_t recent_cpu` and `int nice` to `struct thread` for priority calculations
+* Add array of lists `struct list ready_queues` of size 64 to `thread.c` which keeps track of ready threads of different priorities
+* Add global variable `int load_avg` to store current systen load average to `thread.c`
+* Modify `thread_set_priority()`, `thread_get_priority()` to ignore self-controlled priority
+* Modify `next_thread_to_run()`, `thread_get_recent_cpu()`, `thread_get_load_avg()` for priority calculations
+
 #### Algorithms
+
+1) Computing priority
+  * Disable interrupts first before doing any calculations because accessing shared resources (done already with `thread_yield()`, `thread_block()`, or `thread_exit()`)
+  * Priority is calculated on thread initialization and for every thread once every 4th clock tick via `timer_interrupt()` using spec formula
+    * Should also be recalculated when any thread’s `nice` value changes with `thread_set_nice()`
+    * Only currently running thread’s `recent_cpu` changes every 4th tick so no need to recalculate all threads’ priorities (only check all every second when `load_avg` changes - more efficient than recalculating everything every 4th tick), `load_avg` changes whenever a thread becomes ready
+  * `recent_cpu` for every thread is calculated every second with formula, and incremented by 1 for the running thread every timer interrupt (on `thread_tick()`)
+    * To check every second: `timer_ticks() % TIMER_FREQ == 0`
+  * Calculate system `load_avg` (running or ready to run threads) first with `thread_get_load_avg()`, then calculate `recent_cpu` for each thread, then calculate priority. Reassign threads to their new priority queues after calculation using list_insert_ordered
+    * We can access ready/running threads with list `ready_list`, and our current thread if it’s not the idle thread
+
+2) Running threads
+  * If the current thread is finished running before priorities change, exit
+  * If the thread doesn’t finish running, yield the thread, which will put it back on the ready list until its priority is high again. 
+
+
 #### Synchronization
+
+**Shared resources**
+* Array of ready queues for MLFQS (`ready_queues`)
+* System load average `load_avg`
+* `struct thread` fields: `nice`, `recent_cpu`
+
+**Strategy for preventing race conditions**
+
+MLFQS: because Pintos is a uniprocessor system, an operation is atomic if the timer interrupts are disabled. Hence, we do not have to worry about race conditions if we disable interrupts whenever we are modifying a shared resource (just have to be careful not to disable interrupts excessively).
+
 #### Rationale
+
+**Alternatives** 
+
+We thought about using 1 list instead of 64 lists of different priorities. Using 1 list would use less space, but since we have to constantly upgrade and downgrade priorities, we would have to do comparison-based sorting which could run in O(n^2), as opposed to constant time array accesses and queue operations.
+
+**Space and time complexity**
+
+Space of O(64n) = O(n) where n is the length of the longest queue. We can access elements of the array in constant time O(1), and remove and add elements from the queue in O(1).
+
 
 ### Additional Questions
 1) 
@@ -154,4 +200,4 @@ timer ticks | R(A) | R(B) | R(C) | P(A) | P(B) | P(C) | thread to run
 36        |   20  |   12  | 4   |    58  |   58   | 58     |B
 
 
-3) There are ambiguities when 2 or more threads have the same highest priorities. In this case, keep running the current thread if it is one of the threads with the highest priority (don’t yield since that requires more work, ie. calling `schedule()`, etc). If the threads with the same highest priorities aren’t one of the running threads, choose the thread that has been least recently run.  
+3) There are ambiguities when 2 or more threads have the same highest priorities. In this case, keep running the current thread if it is one of the threads with the highest priority (don’t yield since that requires more work, ie. calling `schedule()`, etc). If the threads with the same highest priorities aren’t one of the running threads, choose the thread that has been least recently run.  sp
