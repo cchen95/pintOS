@@ -238,6 +238,11 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+  if (thread_mlfqs) {
+
+  } else {
+
+  }
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -309,6 +314,11 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread)
     list_push_back (&ready_list, &cur->elem);
+  if (thread_mlfqs) {
+
+  } else {
+
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -335,6 +345,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+  if (thread_mlfqs) {
+
+  } else {
+
+  }
   thread_current ()->priority = new_priority;
 }
 
@@ -342,6 +357,11 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void)
 {
+  if (thread_mlfqs) {
+
+  } else {
+
+  }
   return thread_current ()->priority;
 }
 
@@ -490,6 +510,11 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void)
 {
+  if (thread_mlfqs) {
+
+  } else {
+
+  }
   if (list_empty (&ready_list))
     return idle_thread;
   else
@@ -559,6 +584,12 @@ schedule (void)
   ASSERT (intr_get_level () == INTR_OFF);
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
+
+  if (thread_mlfqs) {
+
+  } else {
+    
+  }
 
   if (cur != next)
     prev = switch_threads (cur, next);
