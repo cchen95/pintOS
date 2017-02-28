@@ -28,6 +28,8 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+static struct list sleeping_threads_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -85,10 +87,6 @@ static tid_t allocate_tid (void);
    It is not safe to call thread_current() until this function
    finishes. */
 void
-<<<<<<< HEAD
-
-=======
->>>>>>> 81c04a231523daaa082204b53bd8d3bc5f4d534f
 thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
@@ -96,6 +94,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleeping_threads_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -343,6 +342,21 @@ thread_foreach (thread_action_func *func, void *aux)
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
     }
+}
+
+bool
+wake_value_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->time_to_wake < b->time_to_wake;
+}
+
+struct list *
+get_sleeping_threads(void) {
+  return &sleeping_threads_list;
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
