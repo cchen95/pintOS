@@ -92,6 +92,8 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int64_t time_to_wake;
+    int nice;                           /* Niceness value */
+    fixed_point_t recent_cpu;           /* Recent CPU */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

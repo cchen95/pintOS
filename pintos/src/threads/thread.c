@@ -358,7 +358,13 @@ int
 thread_get_priority (void)
 {
   if (thread_mlfqs) {
-
+    // get fixed points for all integers
+    struct thread *t = thread_current();
+    fixed_point_t fp_nice = fix_int(t->nice * 2);
+    fixed_point_t fp_pri_max = fix_int(PRI_MAX);
+    fixed_point_t priority = fix_sub(fix_sub(fp_pri_max, fix_unscale(t->recent_cpu, 4)), fp_nice);
+    // round down to nearest integer
+    t->priority = fix_trunc(priority);
   } else {
 
   }
@@ -369,31 +375,37 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice UNUSED)
 {
-  /* Not yet implemented. */
+  thread_current ()->nice = nice;
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  fixed_point_t w1 = fix_frac(59, 60);
+  fixed_point_t w2 = fix_frac(1, 60);
+  fixed_point_t ready_size = fix_int(list_size(&ready_list));
+  load_avg = fix_add(fix_mul(w1, load_avg), fix_mul(w2, ready_size));
+  return fix_round(load_avg) * 100;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  struct thread *t = thread_current();
+  t->recent_cpu = fix_mul(fix_div(fix_scale(load_avg, 2),
+                                fix_add(fix_scale(load_avg, 2), fix_int(1))),
+                         t->recent_cpu);
+  t->recent_cpu = fix_add(t->recent_cpu, fix_int(t->nice));
+  return fix_round(t->recent_cpu) * 100;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -588,7 +600,7 @@ schedule (void)
   if (thread_mlfqs) {
 
   } else {
-    
+
   }
 
   if (cur != next)
