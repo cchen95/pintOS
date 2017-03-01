@@ -102,6 +102,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  load_avg = fix_int(0);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -138,6 +139,7 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+  thread_ticks++;
   if (thread_mlfqs) {
     t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
     if (timer_ticks() % TIMER_FREQ == 0) {
@@ -148,18 +150,18 @@ thread_tick (void)
         for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
            next = list_entry (e, struct thread, allelem);
            next->recent_cpu = mlfqs_get_recent_cpu(next);
-           if (++thread_ticks >= TIME_SLICE)
+           if (thread_ticks >= TIME_SLICE)
             next->priority = mlfqs_get_priority(next);
         }
       }
     }
-    if (++thread_ticks >= TIME_SLICE) {
+    if (thread_ticks >= TIME_SLICE) {
       t->priority = mlfqs_get_priority(t);
     }
   }
 
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
+  if (thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 }
 
@@ -577,6 +579,7 @@ next_thread_to_run (void)
   else {
     if (thread_mlfqs) {
       struct list_elem *next = list_max(&ready_list, priority_less, NULL);
+      list_remove(next);
       return list_entry (next, struct thread, elem);
     } else {
       return list_entry (list_pop_front (&ready_list), struct thread, elem);
