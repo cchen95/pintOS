@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -137,6 +138,26 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+  if (thread_mlfqs) {
+    t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
+    if (timer_ticks() % TIMER_FREQ == 0) {
+      thread_get_load_avg();
+      if (!list_empty(&ready_list)) {
+        struct list_elem *e;
+        struct thread *next;
+        for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
+           next = list_entry (e, struct thread, allelem);
+           next->recent_cpu = mlfqs_get_recent_cpu(next);
+           if (++thread_ticks >= TIME_SLICE)
+            next->priority = mlfqs_get_priority(next);
+        }
+      }
+    }
+    if (++thread_ticks >= TIME_SLICE) {
+      t->priority = mlfqs_get_priority(t);
+    }
+  }
+
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
@@ -184,6 +205,7 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
+  curr_thread = thread_current();
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
   t->nice = curr_thread->nice;
@@ -347,6 +369,24 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/* Calculates thread t's priority */
+int mlfqs_get_priority (struct thread *t) {
+  fixed_point_t fp_nice = fix_int(t->nice * 2);
+  fixed_point_t fp_pri_max = fix_int(PRI_MAX);
+  return fix_trunc(fix_sub(
+                          fix_sub(fp_pri_max,
+                          fix_unscale(t->recent_cpu, 4)), fp_nice));
+}
+
+/* Gets and sets thread t's recent_cpu */
+fixed_point_t mlfqs_get_recent_cpu (struct thread *t) {
+  t->recent_cpu = fix_mul(fix_div(fix_scale(load_avg, 2),
+                                fix_add(fix_scale(load_avg, 2), fix_int(1))),
+                         t->recent_cpu);
+  t->recent_cpu = fix_add(t->recent_cpu, fix_int(t->nice));
+  return t->recent_cpu;
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority)
@@ -364,13 +404,7 @@ int
 thread_get_priority (void)
 {
   if (thread_mlfqs) {
-    // get fixed points for all integers
-    struct thread *t = thread_current();
-    fixed_point_t fp_nice = fix_int(t->nice * 2);
-    fixed_point_t fp_pri_max = fix_int(PRI_MAX);
-    fixed_point_t priority = fix_sub(fix_sub(fp_pri_max, fix_unscale(t->recent_cpu, 4)), fp_nice);
-    // round down to nearest integer
-    t->priority = fix_trunc(priority);
+    thread_current ()->priority = mlfqs_get_priority(thread_current());
   } else {
 
   }
@@ -406,12 +440,20 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void)
 {
-  struct thread *t = thread_current();
-  t->recent_cpu = fix_mul(fix_div(fix_scale(load_avg, 2),
-                                fix_add(fix_scale(load_avg, 2), fix_int(1))),
-                         t->recent_cpu);
-  t->recent_cpu = fix_add(t->recent_cpu, fix_int(t->nice));
-  return fix_round(t->recent_cpu) * 100;
+  fixed_point_t recent_cpu = mlfqs_get_recent_cpu(thread_current());
+  thread_current ()->recent_cpu = recent_cpu;
+  return fix_round(recent_cpu) * 100;
+}
+
+/* Returns true if priority A is less than priority B, false
+   otherwise. */
+static bool
+priority_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  return a->priority < b->priority;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -530,15 +572,16 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void)
 {
-  if (thread_mlfqs) {
-
-  } else {
-
-  }
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else {
+    if (thread_mlfqs) {
+      struct list_elem *next = list_max(&ready_list, priority_less, NULL);
+      return list_entry (next, struct thread, elem);
+    } else {
+      return list_entry (list_pop_front (&ready_list), struct thread, elem);
+    }
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
