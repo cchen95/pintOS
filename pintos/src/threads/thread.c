@@ -535,7 +535,25 @@ next_thread_to_run (void)
   {
     //return list_entry (list_pop_front (&ready_list), struct thread, elem);
     //find the thread with the highest priority and return it
+    return get_highest_priority_thread();
   }
+}
+
+static struct thread *
+get_highest_priority_thread()
+{
+  list_elem tmp;
+  //int highest_priority;
+  struct thread *highest_priority_thread;
+  struct list_elem start = ready_list->head;
+  for(tmp = start; tmp->next != NULL; tmp = tmp->next;)
+  {
+    if (tmp->value->priority > highest_priority_thread->priority)
+    {
+      highest_priority_thread = tmp->value;
+    }
+  }
+  return highest_priority_thread;
 }
 
 /* Completes a thread switch by activating the new thread's page
