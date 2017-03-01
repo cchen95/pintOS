@@ -375,9 +375,11 @@ thread_foreach (thread_action_func *func, void *aux)
 int mlfqs_get_priority (struct thread *t) {
   fixed_point_t fp_nice = fix_int(t->nice * 2);
   fixed_point_t fp_pri_max = fix_int(PRI_MAX);
-  return fix_trunc(fix_sub(
-                          fix_sub(fp_pri_max,
-                          fix_unscale(t->recent_cpu, 4)), fp_nice));
+  int priority = fix_trunc(fix_sub(fix_sub(fp_pri_max,
+                                            fix_unscale(t->recent_cpu, 4)), fp_nice));
+  if (priority < PRI_MIN) priority = PRI_MIN;
+  if (priority > PRI_MAX) priority = PRI_MAX;
+  return priority;
 }
 
 /* Gets and sets thread t's recent_cpu */
@@ -415,9 +417,10 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED)
+thread_set_nice (int nice)
 {
   thread_current ()->nice = nice;
+  thread_get_priority();
 }
 
 /* Returns the current thread's nice value. */
@@ -431,10 +434,14 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
+  enum intr_level old_level;
   fixed_point_t w1 = fix_frac(59, 60);
   fixed_point_t w2 = fix_frac(1, 60);
+
+  old_level = intr_disable();
   fixed_point_t ready_size = fix_int(list_size(&ready_list));
   load_avg = fix_add(fix_mul(w1, load_avg), fix_mul(w2, ready_size));
+  intr_set_level(old_level);
   return fix_round(load_avg) * 100;
 }
 
@@ -578,8 +585,11 @@ next_thread_to_run (void)
     return idle_thread;
   else {
     if (thread_mlfqs) {
+      enum intr_level old_level;
+      old_level = intr_disable();
       struct list_elem *next = list_max(&ready_list, priority_less, NULL);
       list_remove(next);
+      intr_set_level(old_level);
       return list_entry (next, struct thread, elem);
     } else {
       return list_entry (list_pop_front (&ready_list), struct thread, elem);
