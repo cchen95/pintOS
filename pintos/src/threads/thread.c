@@ -336,46 +336,56 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  bool yield_now;
+  enum intr_level old_level;
+  old level = intr_disable();
+  if (thread_current()->priority == thread_current()->base_priority)
+  {
+    thread_current ()->priority = new_priority;
+    thread_current ()->base_priority = new_priority;
+  }
+  else if (new_priority < thread_current()->priority)
+  {
+    thread_current()->base_priority = new_priority;
+  }
+  else
+  {
+    thread_current ()->priority = new_priority;
+    thread_current ()->base_priority = new_priority;
+  }
+  if (cur->status == THREAD_RUNNING && !list_empty(&ready_list))
+  {
+    if (get_highest_priority_thread() != thread_current())
+    {
+      //may need to enable thread interrupts
+      yield_now = true;
+    }
+  }
+  intr_set_level(old_level);
+  if yield_now
+  {
+    thread_yield();
+  }
 }
 
 void
-thread_update_priority (struct thread *cur, int new_priority, bool donated)
+thread_update_priority (struct thread *other, int new_priority)
 {
   enum intr_level old_level;
   old_level = intr_disable();
 
-  //ASSERT (is_thread(cur))
+  ASSERT (is_thread(other));
   //maybe also assert that the new priority is between PRIORITY_MIN and PRIORITY_MAX
 
-  if(!donated)
+  if(new_priority > other->priority)
   {
-    if(cur->donated && new_priority < cur->priority)
-    {
-      //cur->base_priority = new_priority;
-      //do we even need this
-    }
-    else
-    {
-      cur->priority = new_priority;
-      cur->donated = true;
-    }
+    other->priority = new_priority;
+    thread_update_priority(other->blocked_by->holder, new_priority);
   }
 
-  //below might be completely unnecessary
-  if (cur->status == THREAD_READY)
-  {
-    list_remove (&cur->elem);
-    list_insert_ordered(&ready_list, &cur->elem), /*some comparison function */, NULL);
-    //we only need the above if we're using the ordered list thing
-  }
-  else if (cur->status == THREAD_RUNNING && list_entry(list_begin(&ready_list), struct thread, elem)->priority > cur->priority)
-  {
-    //only works if we use the ordered list
-    thread_yield_current(cur);
-  }
   intr_set_level(old_level);
 }
+
 
 /* Returns the current thread's priority. */
 int
@@ -501,6 +511,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->base_priority = priority;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
