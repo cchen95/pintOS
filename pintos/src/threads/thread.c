@@ -141,7 +141,8 @@ thread_tick (void)
 
   thread_ticks++;
   if (thread_mlfqs) {
-    t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
+    if (t != idle_thread)
+      t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
     if (timer_ticks() % TIMER_FREQ == 0) {
       thread_get_load_avg();
       if (!list_empty(&ready_list)) {
@@ -447,7 +448,7 @@ thread_get_load_avg (void)
 
   old_level = intr_disable();
   int num_ready = list_size(&ready_list);
-  if (thread_current()->status == THREAD_RUNNING) num_ready++;
+  if (thread_current()->status == THREAD_RUNNING && thread_current() != idle_thread) num_ready++;
   fixed_point_t ready_size = fix_int(num_ready);
   load_avg = fix_add(fix_mul(w1, load_avg), fix_scale(w2, num_ready));
   intr_set_level(old_level);
@@ -458,6 +459,9 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void)
 {
+  if (timer_ticks() % TIMER_FREQ != 0) {
+    return fix_round(fix_scale(thread_current()->recent_cpu, 100));
+  }
   fixed_point_t recent_cpu = mlfqs_get_recent_cpu(thread_current());
   thread_current ()->recent_cpu = recent_cpu;
   return fix_round(fix_scale(recent_cpu, 100));
