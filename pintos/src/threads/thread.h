@@ -140,6 +140,10 @@ struct list *get_sleeping_threads(void);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+
+int mlfqs_get_priority (struct thread *t);
+fixed_point_t mlfqs_get_recent_cpu (struct thread *t);
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
