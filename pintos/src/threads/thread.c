@@ -384,10 +384,14 @@ int mlfqs_get_priority (struct thread *t) {
 
 /* Gets and sets thread t's recent_cpu */
 fixed_point_t mlfqs_get_recent_cpu (struct thread *t) {
+  enum intr_level old_level;
+
+  old_level = intr_disable();
   t->recent_cpu = fix_mul(fix_div(fix_scale(load_avg, 2),
                                 fix_add(fix_scale(load_avg, 2), fix_int(1))),
                          t->recent_cpu);
   t->recent_cpu = fix_add(t->recent_cpu, fix_int(t->nice));
+  intr_set_level(old_level);
   return t->recent_cpu;
 }
 
@@ -434,15 +438,20 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
+  if (timer_ticks() % TIMER_FREQ != 0) {
+    return fix_round(fix_scale(load_avg, 100));
+  }
   enum intr_level old_level;
   fixed_point_t w1 = fix_frac(59, 60);
   fixed_point_t w2 = fix_frac(1, 60);
 
   old_level = intr_disable();
-  fixed_point_t ready_size = fix_int(list_size(&ready_list));
-  load_avg = fix_add(fix_mul(w1, load_avg), fix_mul(w2, ready_size));
+  int num_ready = list_size(&ready_list);
+  if (thread_current()->status == THREAD_RUNNING) num_ready++;
+  fixed_point_t ready_size = fix_int(num_ready);
+  load_avg = fix_add(fix_mul(w1, load_avg), fix_scale(w2, num_ready));
   intr_set_level(old_level);
-  return fix_round(load_avg) * 100;
+  return fix_round(fix_scale(load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -451,7 +460,7 @@ thread_get_recent_cpu (void)
 {
   fixed_point_t recent_cpu = mlfqs_get_recent_cpu(thread_current());
   thread_current ()->recent_cpu = recent_cpu;
-  return fix_round(recent_cpu) * 100;
+  return fix_round(fix_scale(recent_cpu, 100));
 }
 
 /* Returns true if priority A is less than priority B, false
