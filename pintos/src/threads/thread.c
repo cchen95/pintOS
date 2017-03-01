@@ -23,6 +23,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+//would be very helpful if ready_list was always sorted
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -338,6 +339,44 @@ thread_set_priority (int new_priority)
   thread_current ()->priority = new_priority;
 }
 
+void
+thread_update_priority (struct thread *cur, int new_priority, bool donated)
+{
+  enum intr_level old_level;
+  old_level = intr_disable();
+
+  //ASSERT (is_thread(cur))
+  //maybe also assert that the new priority is between PRIORITY_MIN and PRIORITY_MAX
+
+  if(!donated)
+  {
+    if(cur->donated && new_priority < cur->priority)
+    {
+      //cur->base_priority = new_priority;
+      //do we even need this
+    }
+    else
+    {
+      cur->priority = new_priority;
+      cur->donated = true;
+    }
+  }
+
+  //below might be completely unnecessary
+  if (cur->status == THREAD_READY)
+  {
+    list_remove (&cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem), /*some comparison function */, NULL);
+    //we only need the above if we're using the ordered list thing
+  }
+  else if (cur->status == THREAD_RUNNING && list_entry(list_begin(&ready_list), struct thread, elem)->priority > cur->priority)
+  {
+    //only works if we use the ordered list
+    thread_yield_current(cur);
+  }
+  intr_set_level(old_level);
+}
+
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
@@ -493,7 +532,10 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  {
+    //return list_entry (list_pop_front (&ready_list), struct thread, elem);
+    //find the thread with the highest priority and return it
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
