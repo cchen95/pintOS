@@ -146,11 +146,11 @@ thread_tick (void)
       t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
     if (timer_ticks() % TIMER_FREQ == 0) {
       mlfqs_load_avg();
+      t->recent_cpu = mlfqs_get_recent_cpu(t);
       if (!list_empty(&ready_list)) {
         struct list_elem *e;
         struct thread *next;
         enum intr_level old_level = intr_disable();
-        t->recent_cpu = mlfqs_get_recent_cpu(t);
         for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
            next = list_entry (e, struct thread, elem);
            next->recent_cpu = mlfqs_get_recent_cpu(next);
@@ -158,7 +158,6 @@ thread_tick (void)
             next->priority = mlfqs_get_priority(next);
         }
         intr_set_level (old_level);
-
       }
     }
     if (thread_ticks >= TIME_SLICE) {
@@ -391,7 +390,6 @@ int mlfqs_get_priority (struct thread *t) {
 /* Gets and sets thread t's recent_cpu */
 fixed_point_t mlfqs_get_recent_cpu (struct thread *t) {
   enum intr_level old_level;
-
   old_level = intr_disable();
   t->recent_cpu = fix_mul(fix_div(fix_scale(load_avg, 2),
                                 fix_add(fix_scale(load_avg, 2), fix_int(1))),
