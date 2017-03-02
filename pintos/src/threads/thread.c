@@ -107,6 +107,7 @@ void
 thread_start (void) 
 {
   /* Create the idle thread. */
+  //printf("ASDFASD");
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
@@ -434,16 +435,17 @@ get_highest_priority_thread(void)
   old_level = intr_disable();
   struct list_elem *tmp;
   //int highest_priority;
-  struct thread *highest_priority_thread;
+  struct thread *highest_priority_thread = NULL;
   struct list_elem *start = list_begin(&ready_list);
-  for(tmp = start; tmp->next != NULL; tmp = tmp->next)
+  for(tmp = start; tmp->next != list_end (&ready_list); tmp = tmp->next)
   {
-    if (list_entry(tmp, struct thread, elem)->priority > highest_priority_thread->priority)
+    if (highest_priority_thread == NULL || list_entry(tmp, struct thread, elem)->priority > highest_priority_thread->priority)
     {
-      highest_priority_thread = list_entry(tmp, struct thread, elem)->priority;
+      highest_priority_thread = list_entry(tmp, struct thread, elem);
     }
   }
   intr_set_level(old_level);
+  //printf("%s", highest_priority_thread->name);
   return highest_priority_thread;
 }
 

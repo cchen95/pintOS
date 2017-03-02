@@ -237,11 +237,11 @@ get_highest_priority_waiter_of_held_locks(void)
   struct list_elem *start = list_begin(&thread_current()->held_locks);
   struct list_elem *tmp;
   struct list_elem *tmp2;
-  for(tmp = start; tmp->next != NULL; tmp = tmp->next)
+  for(tmp = start; tmp->next != list_end (&thread_current()->held_locks); tmp = tmp->next)
   {
     struct list waiters = list_entry(tmp, struct lock, elem_lock)->semaphore.waiters;
     struct list_elem *waiters_start = list_begin(&waiters);
-    for(tmp2 = waiters_start; tmp2->next != NULL; tmp2 = tmp2->next){
+    for(tmp2 = waiters_start; tmp2->next != list_end (&waiters); tmp2 = tmp2->next){
       int waiter_pri = list_entry(tmp2, struct thread, elem)->priority;
       if (waiter_pri > highest_priority)
       {
