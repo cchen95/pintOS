@@ -168,7 +168,7 @@ sema_up (struct semaphore *sema)
   sema->value++;
   if (next != NULL && next->priority > thread_current()->priority)
   {
-    thread_yield_other(thread_current());
+    thread_yield();
   }
   intr_set_level (old_level);
 }
@@ -331,6 +331,7 @@ lock_release (struct lock *lock)
   if (!thread_mlfqs)
   {
     list_remove(&lock->elem_lock);
+    t->blocked_by = NULL;
     if(list_empty(&t->held_locks))
     {
       thread_set_priority(t->base_priority);

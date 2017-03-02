@@ -437,7 +437,7 @@ thread_update_priority (struct thread *other, int new_priority)
 
   if (other->status == THREAD_RUNNING && get_highest_priority_thread()->priority > other->priority)
   {
-    thread_yield_other(other);
+    thread_yield();
   }
 
   intr_set_level(old_level);
@@ -487,6 +487,9 @@ thread_get_recent_cpu (void)
 bool
 thread_highest_priority(void)
 {
+  if (list_empty(&ready_list)) {
+    return true;
+  }
   return get_highest_priority_thread()->priority <= thread_current()->priority;
 }
 
