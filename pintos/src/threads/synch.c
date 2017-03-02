@@ -31,7 +31,43 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+static bool priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool lock_priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
+
+static bool lock_priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+  ASSERT (a_ != NULL);
+  ASSERT (b_ != NULL);
+  struct lock *a = list_entry(a_, struct lock, elem_lock);
+  struct lock *b = list_entry(b_, struct lock, elem_lock);
+  struct list_elem *highest_a = list_max(&(a->semaphore.waiters), priority_less, NULL);
+  struct list_elem *highest_b = list_max(&(b->semaphore.waiters), priority_less, NULL);
+  return list_entry(highest_a, struct thread, elem)->priority < list_entry(highest_b, struct thread, elem)->priority;
+}
+
+static bool
+priority_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  return a->priority < b->priority;
+}
+
+int
+get_highest_priority_waiter_of_held_locks(void)
+{
+  struct list_elem *highest = list_max(&(thread_current()->held_locks), lock_priority_less, NULL);
+  return list_entry(highest, struct thread, elem)->priority;
+}
+
+int
+get_highest_priority_waiter_of_lock(struct lock *lock)
+{
+  struct list_elem *highest = list_max(&(lock->semaphore.waiters), priority_less, NULL);
+  return list_entry(highest, struct thread, elem)->priority;
+}
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -196,16 +232,44 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
+  // int next_lock_priority = -1;
+  struct lock *next = lock;
+  struct thread *lock_holder = lock->holder;
   enum intr_level old_level;
-  if (lock->holder != NULL) {
-    thread_update_priority(lock->holder, thread_current()->priority);
+  old_level = intr_disable();
+  
+  if (lock_holder != NULL) {
+    thread_current()->blocked_by = lock;
+    //thread_update_priority(lock->holder, thread_current()->priority);
   }
-  thread_current()->blocked_by = lock;
+  while(!thread_mlfqs && lock_holder != NULL && lock_holder->priority < thread_current()->priority)
+  {
+    thread_update_priority(lock_holder, thread_current()->priority);
+    // if (get_highest_priority_waiter_of_lock(next) < thread_current()->priority
+    // {
+    //   next_lock_priority = thread_current()->priority;
+    // }
+    if (lock_holder->blocked_by != NULL)
+    {
+      next = lock->holder->blocked_by;
+      lock_holder = lock_holder->blocked_by->holder;
+    }
+    else
+    {
+      break;
+    }
+  }
+  
   sema_down (&lock->semaphore);
   thread_current()->blocked_by = NULL;
-  old_level = intr_disable();
-  list_push_back (&thread_current()->held_locks, &lock->elem_lock);
+  //old_level = intr_disable();
+  //list_push_back (&thread_current()->held_locks, &lock->elem_lock);
   lock->holder = thread_current ();
+  if (!thread_mlfqs)
+  {
+    thread_current()->blocked_by = NULL;
+    list_push_back (&thread_current()->held_locks, &lock->elem_lock);
+  }
   intr_set_level(old_level);
 }
 
@@ -229,28 +293,7 @@ lock_try_acquire (struct lock *lock)
   return success;
 }
 
-int
-get_highest_priority_waiter_of_held_locks(void)
-{
-  //struct list held_locks = thread_current()->held_locks;
-  int highest_priority;
-  struct list_elem *start = list_begin(&thread_current()->held_locks);
-  struct list_elem *tmp;
-  struct list_elem *tmp2;
-  for(tmp = start; tmp->next != list_end (&thread_current()->held_locks); tmp = tmp->next)
-  {
-    struct list waiters = list_entry(tmp, struct lock, elem_lock)->semaphore.waiters;
-    struct list_elem *waiters_start = list_begin(&waiters);
-    for(tmp2 = waiters_start; tmp2->next != list_end (&waiters); tmp2 = tmp2->next){
-      int waiter_pri = list_entry(tmp2, struct thread, elem)->priority;
-      if (waiter_pri > highest_priority)
-      {
-        highest_priority = waiter_pri;
-      }
-    }
-  }
-  return highest_priority;
-}
+
 
 /* Releases LOCK, which must be owned by the current thread.
 
@@ -267,29 +310,31 @@ lock_release (struct lock *lock)
   struct thread *t = thread_current();
 
   lock->holder = NULL;
+  sema_up (&lock->semaphore);
   if (!thread_mlfqs)
   {
+    list_remove(&lock->elem_lock);
     if(list_empty(&t->held_locks))
     {
-      t->priority = t->base_priority;
+      thread_set_priority(t->base_priority);
     }
     else
     {
       int highest_priority_waiters = get_highest_priority_waiter_of_held_locks();
       if (highest_priority_waiters > thread_current()->base_priority)
       {
-        thread_current()->priority = highest_priority_waiters;
+        thread_update_priority(t, highest_priority_waiters);
       }
       else
       {
-        thread_current()->priority = thread_current()->base_priority;
+        thread_set_priority(t->base_priority);
       }
     }
   }
   if (!thread_highest_priority()){
     thread_yield();
   }
-  sema_up (&lock->semaphore);
+  
   intr_set_level(old_level);
 }
 

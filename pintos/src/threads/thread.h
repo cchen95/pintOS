@@ -132,6 +132,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_yield_other(struct thread *other);
 
 bool thread_highest_priority(void);
 

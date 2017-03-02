@@ -85,6 +85,16 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+static bool
+priority_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  return a->priority < b->priority;
+}
+
 void
 thread_init (void) 
 {
@@ -315,6 +325,20 @@ thread_yield (void)
   schedule ();
   intr_set_level (old_level);
 }
+void
+thread_yield_other (struct thread *other) 
+{
+  enum intr_level old_level;
+  
+  ASSERT (!intr_context ());
+
+  old_level = intr_disable ();
+  if (other != idle_thread) 
+    list_push_back (&ready_list, &other->elem);
+  other->status = THREAD_READY;
+  schedule ();
+  intr_set_level (old_level);
+}
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
@@ -333,40 +357,48 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+static struct thread *
+get_highest_priority_thread(void)
+{
+  struct list_elem *highest = list_max(&ready_list, priority_less, NULL);
+  return list_entry (highest, struct thread, elem);
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
-  bool yield_now;
-  enum intr_level old_level;
-  old_level = intr_disable();
-  if (thread_current()->priority == thread_current()->base_priority)
-  {
-    thread_current ()->priority = new_priority;
-    thread_current ()->base_priority = new_priority;
-  }
-  else if (new_priority < thread_current()->priority)
-  {
-    thread_current()->base_priority = new_priority;
-  }
-  else
-  {
-    thread_current ()->priority = new_priority;
-    thread_current ()->base_priority = new_priority;
-  }
-  if (thread_current()->status == THREAD_RUNNING && !list_empty(&ready_list))
-  {
-    if (!thread_highest_priority())
-    {
-      //may need to enable thread interrupts
-      yield_now = true;
-    }
-  }
-  intr_set_level(old_level);
-  if (yield_now)
-  {
-    thread_yield();
-  }
+  // bool yield_now;
+  // enum intr_level old_level;
+  // old_level = intr_disable();
+  // if (thread_current()->priority == thread_current()->base_priority)
+  // {
+  //   thread_current ()->priority = new_priority;
+  //   thread_current ()->base_priority = new_priority;
+  // }
+  // else if (new_priority < thread_current()->priority)
+  // {
+  //   thread_current()->base_priority = new_priority;
+  // }
+  // else
+  // {
+  //   thread_current ()->priority = new_priority;
+  //   thread_current ()->base_priority = new_priority;
+  // }
+  // if (thread_current()->status == THREAD_RUNNING && !list_empty(&ready_list))
+  // {
+  //   if (!thread_highest_priority())
+  //   {
+  //     //may need to enable thread interrupts
+  //     yield_now = true;
+  //   }
+  // }
+  // intr_set_level(old_level);
+  // if (yield_now)
+  // {
+  //   thread_yield();
+  // }
+  thread_update_priority(thread_current(), new_priority);
 }
 
 void
@@ -378,12 +410,34 @@ thread_update_priority (struct thread *other, int new_priority)
   ASSERT (is_thread(other));
   //maybe also assert that the new priority is between PRIORITY_MIN and PRIORITY_MAX
 
-  if(new_priority > other->priority)
+  // if(new_priority > other->priority)
+  // {
+  //   other->priority = new_priority;
+  //   if (other->blocked_by != NULL) {
+  //     thread_update_priority(other->blocked_by->holder, new_priority);
+  //   }
+  // }
+
+  if(thread_current()->priority == thread_current()->base_priority)
+  {
+    if(other->priority != other->base_priority && new_priority < other->priority)
+    {
+      other->base_priority = new_priority;
+    }
+    else
+    {
+      other->priority = new_priority;
+      other->base_priority = new_priority;
+    }
+  }
+  else
   {
     other->priority = new_priority;
-    if (other->blocked_by != NULL) {
-      thread_update_priority(other->blocked_by->holder, new_priority);
-    }
+  }
+
+  if (other->status == THREAD_RUNNING && get_highest_priority_thread()->priority > other->priority)
+  {
+    thread_yield_other(other);
   }
 
   intr_set_level(old_level);
@@ -428,26 +482,7 @@ thread_get_recent_cpu (void)
   return 0;
 }
 
-static struct thread *
-get_highest_priority_thread(void)
-{
-  enum intr_level old_level;
-  old_level = intr_disable();
-  struct list_elem *tmp;
-  //int highest_priority;
-  struct thread *highest_priority_thread = NULL;
-  struct list_elem *start = list_begin(&ready_list);
-  for(tmp = start; tmp->next != list_end (&ready_list); tmp = tmp->next)
-  {
-    if (highest_priority_thread == NULL || list_entry(tmp, struct thread, elem)->priority > highest_priority_thread->priority)
-    {
-      highest_priority_thread = list_entry(tmp, struct thread, elem);
-    }
-  }
-  intr_set_level(old_level);
-  //printf("%s", highest_priority_thread->name);
-  return highest_priority_thread;
-}
+
 
 bool
 thread_highest_priority(void)
