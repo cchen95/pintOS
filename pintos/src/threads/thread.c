@@ -338,7 +338,7 @@ thread_set_priority (int new_priority)
 {
   bool yield_now;
   enum intr_level old_level;
-  old level = intr_disable();
+  old_level = intr_disable();
   if (thread_current()->priority == thread_current()->base_priority)
   {
     thread_current ()->priority = new_priority;
@@ -353,7 +353,7 @@ thread_set_priority (int new_priority)
     thread_current ()->priority = new_priority;
     thread_current ()->base_priority = new_priority;
   }
-  if (cur->status == THREAD_RUNNING && !list_empty(&ready_list))
+  if (thread_current()->status == THREAD_RUNNING && !list_empty(&ready_list))
   {
     if (!thread_highest_priority())
     {
@@ -362,7 +362,7 @@ thread_set_priority (int new_priority)
     }
   }
   intr_set_level(old_level);
-  if yield_now
+  if (yield_now)
   {
     thread_yield();
   }
@@ -425,6 +425,26 @@ thread_get_recent_cpu (void)
 {
   /* Not yet implemented. */
   return 0;
+}
+
+static struct thread *
+get_highest_priority_thread(void)
+{
+  enum intr_level old_level;
+  old_level = intr_disable();
+  struct list_elem *tmp;
+  //int highest_priority;
+  struct thread *highest_priority_thread;
+  struct list_elem *start = list_begin(&ready_list);
+  for(tmp = start; tmp->next != NULL; tmp = tmp->next)
+  {
+    if (list_entry(tmp, struct thread, elem)->priority > highest_priority_thread->priority)
+    {
+      highest_priority_thread = list_entry(tmp, struct thread, elem)->priority;
+    }
+  }
+  intr_set_level(old_level);
+  return highest_priority_thread;
 }
 
 bool
@@ -561,25 +581,7 @@ next_thread_to_run (void)
   }
 }
 
-static struct thread *
-get_highest_priority_thread()
-{
-  enum intr_level old_level;
-  old_level = intr_disable();
-  list_elem tmp;
-  //int highest_priority;
-  struct thread *highest_priority_thread;
-  struct list_elem start = ready_list->head;
-  for(tmp = start; tmp->next != NULL; tmp = tmp->next;)
-  {
-    if (list_entry(tmp, struct thread, elem)->priority > highest_priority_thread->priority)
-    {
-      highest_priority_thread = list_entry(tmp, struct thread, elem)->value;
-    }
-  }
-  intr_set_level(old_level);
-  return highest_priority_thread;
-}
+
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
