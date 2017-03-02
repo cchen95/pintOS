@@ -148,12 +148,15 @@ thread_tick (void)
       if (!list_empty(&ready_list)) {
         struct list_elem *e;
         struct thread *next;
+        enum intr_level old_level = intr_disable();
         for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
-           next = list_entry (e, struct thread, allelem);
+           next = list_entry (e, struct thread, elem);
            next->recent_cpu = mlfqs_get_recent_cpu(next);
            if (thread_ticks >= TIME_SLICE)
             next->priority = mlfqs_get_priority(next);
         }
+        intr_set_level (old_level);
+
       }
     }
     if (thread_ticks >= TIME_SLICE) {
@@ -459,11 +462,7 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void)
 {
-  if (timer_ticks() % TIMER_FREQ != 0) {
-    return fix_round(fix_scale(thread_current()->recent_cpu, 100));
-  }
-  fixed_point_t recent_cpu = mlfqs_get_recent_cpu(thread_current());
-  thread_current ()->recent_cpu = recent_cpu;
+  fixed_point_t recent_cpu = thread_current ()->recent_cpu;
   return fix_round(fix_scale(recent_cpu, 100));
 }
 
@@ -597,9 +596,11 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else {
+    volatile int size;
     if (thread_mlfqs) {
       enum intr_level old_level;
       old_level = intr_disable();
+      size = list_size(&ready_list);
       struct list_elem *next = list_max(&ready_list, priority_less, NULL);
       list_remove(next);
       intr_set_level(old_level);
