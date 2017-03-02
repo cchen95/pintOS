@@ -143,6 +143,7 @@ void thread_set_priority (int);
 
 int mlfqs_get_priority (struct thread *t);
 fixed_point_t mlfqs_get_recent_cpu (struct thread *t);
+fixed_point_t mlfqs_load_avg (void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

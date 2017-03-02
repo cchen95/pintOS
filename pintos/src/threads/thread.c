@@ -102,6 +102,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->recent_cpu = fix_int(0);
   load_avg = fix_int(0);
 }
 
@@ -141,14 +142,15 @@ thread_tick (void)
 
   thread_ticks++;
   if (thread_mlfqs) {
-    if (t != idle_thread)
+    if (t != idle_thread && t->status == THREAD_RUNNING)
       t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
     if (timer_ticks() % TIMER_FREQ == 0) {
-      thread_get_load_avg();
+      mlfqs_load_avg();
       if (!list_empty(&ready_list)) {
         struct list_elem *e;
         struct thread *next;
         enum intr_level old_level = intr_disable();
+        t->recent_cpu = mlfqs_get_recent_cpu(t);
         for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
            next = list_entry (e, struct thread, elem);
            next->recent_cpu = mlfqs_get_recent_cpu(next);
@@ -399,15 +401,24 @@ fixed_point_t mlfqs_get_recent_cpu (struct thread *t) {
   return t->recent_cpu;
 }
 
+/* Gets and updates load_avg */
+fixed_point_t mlfqs_load_avg (void) {
+  enum intr_level old_level;
+  fixed_point_t w1 = fix_frac(59, 60);
+  fixed_point_t w2 = fix_frac(1, 60);
+
+  old_level = intr_disable();
+  int num_ready = list_size(&ready_list);
+  if (thread_current()->status == THREAD_RUNNING && thread_current() != idle_thread) num_ready++;
+  load_avg = fix_add(fix_mul(w1, load_avg), fix_scale(w2, num_ready));
+  intr_set_level(old_level);
+  return load_avg;
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority)
 {
-  if (thread_mlfqs) {
-
-  } else {
-
-  }
   thread_current ()->priority = new_priority;
 }
 
@@ -415,11 +426,11 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void)
 {
-  if (thread_mlfqs) {
-    thread_current ()->priority = mlfqs_get_priority(thread_current());
-  } else {
-
-  }
+  // if (thread_mlfqs) {
+  //   thread_current ()->priority = mlfqs_get_priority(thread_current());
+  // } else {
+  //
+  // }
   return thread_current ()->priority;
 }
 
@@ -428,7 +439,7 @@ void
 thread_set_nice (int nice)
 {
   thread_current ()->nice = nice;
-  thread_get_priority();
+  thread_set_priority(mlfqs_get_priority(thread_current()));
 }
 
 /* Returns the current thread's nice value. */
@@ -442,19 +453,6 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
-  if (timer_ticks() % TIMER_FREQ != 0) {
-    return fix_round(fix_scale(load_avg, 100));
-  }
-  enum intr_level old_level;
-  fixed_point_t w1 = fix_frac(59, 60);
-  fixed_point_t w2 = fix_frac(1, 60);
-
-  old_level = intr_disable();
-  int num_ready = list_size(&ready_list);
-  if (thread_current()->status == THREAD_RUNNING && thread_current() != idle_thread) num_ready++;
-  fixed_point_t ready_size = fix_int(num_ready);
-  load_avg = fix_add(fix_mul(w1, load_avg), fix_scale(w2, num_ready));
-  intr_set_level(old_level);
   return fix_round(fix_scale(load_avg, 100));
 }
 
@@ -596,11 +594,9 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else {
-    volatile int size;
     if (thread_mlfqs) {
       enum intr_level old_level;
       old_level = intr_disable();
-      size = list_size(&ready_list);
       struct list_elem *next = list_max(&ready_list, priority_less, NULL);
       list_remove(next);
       intr_set_level(old_level);
