@@ -105,6 +105,10 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    int base_priority;
+    struct list held_locks;
+    struct lock *blocked_by;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -148,5 +152,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void thread_donate_priority(struct thread *);
+void thread_update_priorities (struct thread *);
 
 #endif /* threads/thread.h */
