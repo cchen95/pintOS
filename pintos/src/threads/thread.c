@@ -144,22 +144,22 @@ thread_tick (void)
   if (thread_mlfqs) {
     if (t != idle_thread && t->status == THREAD_RUNNING)
       t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
+    /* Update all MLFQS variables every second */
     if (timer_ticks() % TIMER_FREQ == 0) {
       mlfqs_load_avg();
-      t->recent_cpu = mlfqs_get_recent_cpu(t);
-      if (!list_empty(&ready_list)) {
+      if (!list_empty(&all_list)) {
         struct list_elem *e;
         struct thread *next;
         enum intr_level old_level = intr_disable();
-        for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
-           next = list_entry (e, struct thread, elem);
+        for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+           next = list_entry (e, struct thread, allelem);
            next->recent_cpu = mlfqs_get_recent_cpu(next);
-           if (thread_ticks >= TIME_SLICE)
-            next->priority = mlfqs_get_priority(next);
+           next->priority = mlfqs_get_priority(next);
         }
         intr_set_level (old_level);
       }
     }
+    /* Update priority for running thread every 4 ticks. */
     if (thread_ticks >= TIME_SLICE) {
       t->priority = mlfqs_get_priority(t);
     }
@@ -384,6 +384,7 @@ int mlfqs_get_priority (struct thread *t) {
                                             fix_unscale(t->recent_cpu, 4)), fp_nice));
   if (priority < PRI_MIN) priority = PRI_MIN;
   if (priority > PRI_MAX) priority = PRI_MAX;
+  t->priority = priority;
   return priority;
 }
 
@@ -424,11 +425,6 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void)
 {
-  // if (thread_mlfqs) {
-  //   thread_current ()->priority = mlfqs_get_priority(thread_current());
-  // } else {
-  //
-  // }
   return thread_current ()->priority;
 }
 
