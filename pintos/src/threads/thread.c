@@ -81,6 +81,24 @@ priority_less (const struct list_elem *a_, const struct list_elem *b_,
   return a->priority < b->priority;
 }
 
+static bool lock_priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+  ASSERT (a_ != NULL);
+  ASSERT (b_ != NULL);
+  struct lock *a = list_entry(a_, struct lock, elem_lock);
+  struct lock *b = list_entry(b_, struct lock, elem_lock);
+  struct list_elem *highest_a = list_max(&(a->semaphore.waiters), priority_less, NULL);
+  struct list_elem *highest_b = list_max(&(b->semaphore.waiters), priority_less, NULL);
+  return list_entry(highest_a, struct thread, elem)->priority < list_entry(highest_b, struct thread, elem)->priority;
+}
+
+int
+get_highest_priority_waiter_of_held_locks(void)
+{
+  struct list_elem *highest = list_max(&(thread_current()->held_locks), lock_priority_less, NULL);
+  return list_entry(highest, struct thread, elem)->priority;
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -361,37 +379,22 @@ get_highest_priority_thread(void)
 void
 thread_set_priority (int new_priority) 
 {
-  // bool yield_now;
-  // enum intr_level old_level;
-  // old_level = intr_disable();
-  // if (thread_current()->priority == thread_current()->base_priority)
-  // {
-  //   thread_current ()->priority = new_priority;
-  //   thread_current ()->base_priority = new_priority;
-  // }
-  // else if (new_priority < thread_current()->priority)
-  // {
-  //   thread_current()->base_priority = new_priority;
-  // }
-  // else
-  // {
-  //   thread_current ()->priority = new_priority;
-  //   thread_current ()->base_priority = new_priority;
-  // }
-  // if (thread_current()->status == THREAD_RUNNING && !list_empty(&ready_list))
-  // {
-  //   if (!thread_highest_priority())
-  //   {
-  //     //may need to enable thread interrupts
-  //     yield_now = true;
-  //   }
-  // }
-  // intr_set_level(old_level);
-  // if (yield_now)
-  // {
-  //   thread_yield();
-  // }
-  thread_update_priority(thread_current(), new_priority);
+  if (thread_mlfqs)
+    return;
+
+  enum intr_level old_level = intr_disable ();
+  struct thread *t = thread_current ();
+  int old_priority = t->priority;
+
+  t->base_priority = new_priority;
+
+  if (new_priority < old_priority && list_empty (&t->held_locks))
+  {
+    t->priority = new_priority;
+    thread_yield ();
+  }
+
+  intr_set_level (old_level);
 }
 
 void
@@ -704,3 +707,35 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void
+thread_donate_priority (struct thread *t)
+{
+  enum intr_level old_level = intr_disable ();
+  thread_update_priorities (t);
+
+  if (t->status == THREAD_READY)
+  {
+    list_remove (&t->elem);
+    list_push_back(&ready_list, &t->elem);
+  }
+  intr_set_level (old_level);
+}
+
+void
+thread_update_priorities (struct thread *t)
+{
+  enum intr_level old_level = intr_disable ();
+  int max_priority = t->base_priority;
+  int lock_priority;
+
+  if (!list_empty (&t->held_locks))
+  {
+    lock_priority = get_highest_priority_waiter_of_held_locks();
+    if (lock_priority > t->base_priority)
+      max_priority = lock_priority;
+  }
+
+  t->priority = max_priority;
+  intr_set_level (old_level);
+}

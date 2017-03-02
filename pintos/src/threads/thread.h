@@ -149,4 +149,8 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+void thread_donate_priority(struct thread *);
+int get_highest_priority_waiter_of_held_locks(void);
+void thread_update_priorities (struct thread *);
+
 #endif /* threads/thread.h */
