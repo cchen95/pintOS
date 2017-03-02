@@ -123,6 +123,14 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+/* Updates the priority and recent_cpu for a thread. */
+void
+thread_update_priority_cpu (struct thread *t, void *aux UNUSED)
+{
+  t->recent_cpu = mlfqs_get_recent_cpu(t);
+  t->priority = mlfqs_get_priority(t);
+}
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
@@ -144,21 +152,17 @@ thread_tick (void)
   if (thread_mlfqs) {
     if (t != idle_thread && t->status == THREAD_RUNNING)
       t->recent_cpu = fix_add(t->recent_cpu, fix_int(1));
+    
     /* Update all MLFQS variables every second */
     if (timer_ticks() % TIMER_FREQ == 0) {
       mlfqs_load_avg();
       if (!list_empty(&all_list)) {
-        struct list_elem *e;
-        struct thread *next;
         enum intr_level old_level = intr_disable();
-        for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
-           next = list_entry (e, struct thread, allelem);
-           next->recent_cpu = mlfqs_get_recent_cpu(next);
-           next->priority = mlfqs_get_priority(next);
-        }
+        thread_foreach(thread_update_priority_cpu, NULL);
         intr_set_level (old_level);
       }
     }
+
     /* Update priority for running thread every 4 ticks. */
     if (thread_ticks >= TIME_SLICE) {
       t->priority = mlfqs_get_priority(t);

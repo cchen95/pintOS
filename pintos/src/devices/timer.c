@@ -24,6 +24,7 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
+/* List of threads that are sleeping. */
 static struct list sleeping_threads_list;
 
 static intr_handler_func timer_interrupt;
@@ -102,19 +103,15 @@ wake_value_less (const struct list_elem *a_, const struct list_elem *b_,
 void
 timer_sleep (int64_t ticks)
 {
-  struct thread *current_thread = thread_current();
-
-  if (ticks <= 0) {
-    return;
-  }
-
+  if (ticks <= 0) return;
+  struct thread *t = thread_current();
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
   enum intr_level old_level = intr_disable ();
   
-  thread_current()->time_to_wake = start + ticks;
-  list_insert_ordered(&sleeping_threads_list, &current_thread->elem, wake_value_less, NULL);
+  t->time_to_wake = start + ticks;
+  list_insert_ordered(&sleeping_threads_list, &t->elem, wake_value_less, NULL);
   thread_block();
 
   intr_set_level(old_level);
@@ -197,11 +194,11 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
   
-  while (!list_empty(&sleeping_threads_list) && (list_entry(list_front(&sleeping_threads_list), struct thread, elem))->time_to_wake == ticks) { 
+  while (!list_empty(&sleeping_threads_list) && 
+    (list_entry(list_front(&sleeping_threads_list), struct thread, elem))->time_to_wake == ticks) { 
     struct thread *t = list_entry(list_pop_front(&sleeping_threads_list), struct thread, elem);
     thread_unblock(t);
   }
-
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
