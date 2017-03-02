@@ -380,7 +380,9 @@ thread_update_priority (struct thread *other, int new_priority)
   if(new_priority > other->priority)
   {
     other->priority = new_priority;
-    thread_update_priority(other->blocked_by->holder, new_priority);
+    if (other->blocked_by != NULL) {
+      thread_update_priority(other->blocked_by->holder, new_priority);
+    }
   }
 
   intr_set_level(old_level);
@@ -559,9 +561,9 @@ get_highest_priority_thread()
   struct list_elem start = ready_list->head;
   for(tmp = start; tmp->next != NULL; tmp = tmp->next;)
   {
-    if (tmp->value->priority > highest_priority_thread->priority)
+    if (list_entry(tmp, struct thread, elem)->priority > highest_priority_thread->priority)
     {
-      highest_priority_thread = tmp->value;
+      highest_priority_thread = list_entry(tmp, struct thread, elem)->value;
     }
   }
   return highest_priority_thread;

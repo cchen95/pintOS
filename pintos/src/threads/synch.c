@@ -192,11 +192,18 @@ lock_init (struct lock *lock)
 void
 lock_acquire (struct lock *lock)
 {
+  // We might have to look at disabling interrupts.
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  if (lock->holder != NULL) {
+    updatePriority(lock->holder, thread_current()->priority);
+  }
+  thread_current()->blocked_by = lock;
   sema_down (&lock->semaphore);
+  thread_current()->blocked_by = NULL;
+  list_push_back (&thread_current()->held_locks, &lock->elem);
   lock->holder = thread_current ();
 }
 
