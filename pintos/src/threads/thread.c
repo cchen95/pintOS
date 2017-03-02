@@ -185,6 +185,7 @@ thread_create (const char *name, int priority,
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
   tid_t tid;
+  enum intr_level old_level;
 
   ASSERT (function != NULL);
 
@@ -196,6 +197,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  old_level = intr_disable();
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -212,9 +214,11 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  intr_set_level(old_level);
   /* Add to run queue. */
   thread_unblock (t);
 
+  thread_yield();
   return tid;
 }
 
@@ -327,20 +331,7 @@ thread_yield (void)
   schedule ();
   intr_set_level (old_level);
 }
-void
-thread_yield_other (struct thread *other) 
-{
-  enum intr_level old_level;
-  
-  ASSERT (!intr_context ());
 
-  old_level = intr_disable ();
-  if (other != idle_thread) 
-    list_push_back (&ready_list, &other->elem);
-  other->status = THREAD_READY;
-  schedule ();
-  intr_set_level (old_level);
-}
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
