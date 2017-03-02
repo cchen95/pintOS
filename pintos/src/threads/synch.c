@@ -198,13 +198,13 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
   enum intr_level old_level;
   if (lock->holder != NULL) {
-    updatePriority(lock->holder, thread_current()->priority);
+    thread_update_priority(lock->holder, thread_current()->priority);
   }
   thread_current()->blocked_by = lock;
   sema_down (&lock->semaphore);
   thread_current()->blocked_by = NULL;
-  old_level = intr_disable()
-  list_push_back (&thread_current()->held_locks, &lock->elem);
+  old_level = intr_disable();
+  list_push_back (&thread_current()->held_locks, &lock->elem_lock);
   lock->holder = thread_current ();
   intr_set_level(old_level);
 }
@@ -229,6 +229,29 @@ lock_try_acquire (struct lock *lock)
   return success;
 }
 
+int
+get_highest_priority_waiter_of_held_locks(void)
+{
+  //struct list held_locks = thread_current()->held_locks;
+  int highest_priority;
+  struct list_elem *start = list_begin(&thread_current()->held_locks);
+  struct list_elem *tmp;
+  struct list_elem *tmp2;
+  for(tmp = start; tmp->next != NULL; tmp = tmp->next)
+  {
+    struct list waiters = list_entry(tmp, struct lock, elem_lock)->semaphore.waiters;
+    struct list_elem *waiters_start = list_begin(&waiters);
+    for(tmp2 = waiters_start; tmp2->next != NULL; tmp2 = tmp2->next){
+      int waiter_pri = list_entry(tmp2, struct thread, elem)->priority;
+      if (waiter_pri > highest_priority)
+      {
+        highest_priority = waiter_pri;
+      }
+    }
+  }
+  return highest_priority;
+}
+
 /* Releases LOCK, which must be owned by the current thread.
 
    An interrupt handler cannot acquire a lock, so it does not
@@ -246,13 +269,13 @@ lock_release (struct lock *lock)
   lock->holder = NULL;
   if (!thread_mlfqs)
   {
-    if(list_empty(t->held_locks))
+    if(list_empty(&t->held_locks))
     {
       t->priority = t->base_priority;
     }
     else
     {
-      highest_priority_waiters = get_highest_priority_waiter_of_held_locks();
+      int highest_priority_waiters = get_highest_priority_waiter_of_held_locks();
       if (highest_priority_waiters > thread_current()->base_priority)
       {
         thread_current()->priority = highest_priority_waiters;
@@ -267,26 +290,7 @@ lock_release (struct lock *lock)
     thread_yield();
   }
   sema_up (&lock->semaphore);
-}
-
-int
-get_highest_priority_waiter_of_held_locks()
-{
-  //struct list held_locks = thread_current()->held_locks;
-  int highest_priority;
-  struct list_elem start = thread_current()->held_locks->head;
-  for(tmp = start; tmp->next != NULL; tmp = tmp->next)
-  {
-    struct list_elem waiters_start = list_entry(tmp, struct lock, elem_lock)->semaphore->waiters;
-    for(tmp2 = waiters_start; tmp2->next != NULL; tmp2 = tmp2->next){
-      int waiter_pri = list_entry(tmp2, struct thread, elem)->priority > highest_priority)
-      if (waiter_pri > highest_priority)
-      {
-        highest_priority = waiter_pri;
-      }
-    }
-  }
-  return highest_priority;
+  intr_set_level(old_level);
 }
 
 /* Returns true if the current thread holds LOCK, false
