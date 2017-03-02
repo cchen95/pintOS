@@ -558,6 +558,8 @@ next_thread_to_run (void)
 static struct thread *
 get_highest_priority_thread()
 {
+  enum intr_level old_level;
+  old_level = intr_disable();
   list_elem tmp;
   //int highest_priority;
   struct thread *highest_priority_thread;
@@ -569,6 +571,7 @@ get_highest_priority_thread()
       highest_priority_thread = list_entry(tmp, struct thread, elem)->value;
     }
   }
+  intr_set_level(old_level);
   return highest_priority_thread;
 }
 
