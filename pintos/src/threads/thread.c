@@ -355,7 +355,7 @@ thread_set_priority (int new_priority)
   }
   if (cur->status == THREAD_RUNNING && !list_empty(&ready_list))
   {
-    if (get_highest_priority_thread() != thread_current())
+    if (!thread_highest_priority())
     {
       //may need to enable thread interrupts
       yield_now = true;
@@ -425,6 +425,12 @@ thread_get_recent_cpu (void)
 {
   /* Not yet implemented. */
   return 0;
+}
+
+bool
+thread_highest_priority(void)
+{
+  return get_highest_priority_thread()->priority <= thread_current()->priority;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.

@@ -239,9 +239,54 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
+  enum intr_level old_level;
+  old_level = intr_disable();
+  struct thread *t = thread_current();
 
   lock->holder = NULL;
+  if (!thread_mlfqs)
+  {
+    if(list_empty(t->held_locks))
+    {
+      t->priority = t->base_priority;
+    }
+    else
+    {
+      highest_priority_waiters = get_highest_priority_waiter_of_held_locks();
+      if (highest_priority_waiters > thread_current()->base_priority)
+      {
+        thread_current()->priority = highest_priority_waiters;
+      }
+      else
+      {
+        thread_current()->priority = thread_current()->base_priority;
+      }
+    }
+  }
+  if (!thread_highest_priority()){
+    thread_yield();
+  }
   sema_up (&lock->semaphore);
+}
+
+int
+get_highest_priority_waiter_of_held_locks()
+{
+  //struct list held_locks = thread_current()->held_locks;
+  int highest_priority;
+  struct list_elem start = thread_current()->held_locks->head;
+  for(tmp = start; tmp->next != NULL; tmp = tmp->next)
+  {
+    struct list_elem waiters_start = list_entry(tmp, struct lock, elem_lock)->semaphore->waiters;
+    for(tmp2 = waiters_start; tmp2->next != NULL; tmp2 = tmp2->next){
+      int waiter_pri = list_entry(tmp2, struct thread, elem)->priority > highest_priority)
+      if (waiter_pri > highest_priority)
+      {
+        highest_priority = waiter_pri;
+      }
+    }
+  }
+  return highest_priority;
 }
 
 /* Returns true if the current thread holds LOCK, false
