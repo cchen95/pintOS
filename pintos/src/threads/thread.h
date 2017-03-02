@@ -105,7 +105,6 @@ struct thread
 
     int base_priority;
     struct list held_locks;
-    //bool donated;
     struct lock *blocked_by;
   };
 
@@ -132,9 +131,6 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
-void thread_yield_other(struct thread *other);
-
-bool thread_highest_priority(void);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
@@ -142,7 +138,6 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-void thread_update_priority(struct thread *other, int new_priority);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
@@ -150,7 +145,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void thread_donate_priority(struct thread *);
-int get_highest_priority_waiter_of_held_locks(void);
 void thread_update_priorities (struct thread *);
 
 #endif /* threads/thread.h */
