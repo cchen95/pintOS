@@ -614,7 +614,9 @@ next_thread_to_run (void)
   {
     //return list_entry (list_pop_front (&ready_list), struct thread, elem);
     //find the thread with the highest priority and return it
-    return get_highest_priority_thread();
+    struct thread *ret = get_highest_priority_thread();
+    list_remove(&ret->elem);
+    return ret;
   }
 }
 

@@ -31,6 +31,7 @@ void lock_acquire (struct lock *);
 bool lock_try_acquire (struct lock *);
 int get_highest_priority_waiter_of_held_locks(void);
 int get_highest_priority_waiter_of_lock(struct lock *);
+struct thread *get_waiter_with_highest_priority(struct semaphore *);
 void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
 

@@ -68,6 +68,13 @@ get_highest_priority_waiter_of_lock(struct lock *lock)
   struct list_elem *highest = list_max(&(lock->semaphore.waiters), priority_less, NULL);
   return list_entry(highest, struct thread, elem)->priority;
 }
+
+struct thread *
+get_waiter_with_highest_priority(struct semaphore *sema)
+{
+  struct list_elem *highest = list_max(&(sema->waiters), priority_less, NULL);
+  return list_entry(highest, struct thread, elem);
+}
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -145,14 +152,24 @@ void
 sema_up (struct semaphore *sema) 
 {
   enum intr_level old_level;
+  struct thread *next = NULL;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  while (!list_empty (&sema->waiters)) 
+  {
+    // thread_unblock (list_entry (list_pop_front (&sema->waiters),
+    //                             struct thread, elem));
+    next = get_waiter_with_highest_priority(sema);
+    list_remove(&next->elem);
+    thread_unblock(next);
+  }
   sema->value++;
+  if (next != NULL && next->priority > thread_current()->priority)
+  {
+    thread_yield_other(thread_current());
+  }
   intr_set_level (old_level);
 }
 
