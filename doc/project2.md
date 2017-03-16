@@ -111,18 +111,12 @@ None needed
 1. Use `file_deny_write` on file that is being used by user process. Call `file_allow_write` after user is done with this file.
 2. Lock `file_lock` when a file operation function is called and unlock when it is done. With this lock we can ensure that only one filesystem operation is executed at a time, and each must finish before another one is executed.
 3. Each file can be opened by multiple threads at once. However, each thread has its own `open_files_map` and `next_fd`, so each fd maps to a unique file per thread. When we call `open()` on a file, we create its `struct file` pointer in the thread stack, so each thread also has its own unique place in an open file.
-
 #### Rationale
 1. For most of the syscalls, we can use already implemented file operations. Since it&#39;s not recommended to modify the file and filesys files, we create a new struct to easily store the file and its `hash_elem`. We use a hash map to map file descriptors to files for constant access time, so it&#39;s faster than a linked list in which searching for a file would be in O(n) time. It also uses less space than a static array with a predefined size.
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/master
 ### Additional Questions
 1. sc-bad-sp.c
     * Line 18 moves the stack pointer to a bad address (about 64 MB below code segment)
 2. boundary.c
-<<<<<<< HEAD
     1. Line 28 gets the page boundary and stores it in p
     2. Line 29 decrements p by:
         * If length of `src` is less than 4096, decrement p by the length divided by 2.
@@ -130,16 +124,6 @@ None needed
     3. Line 30 attempts to write `src` at address p.
     4. Should fail because it tries to copy `src` across boundary
 #### GDB Questions
-=======
-1. Line 28 gets the page boundary and stores it in p
-2. Line 29 decrements p by:
-  1. If length of `src` is less than 4096, decrement p by the length divided by 2.
-  2. Else, decrement by 4096
-3. Line 30 attempts to write `src` at address p.
-4. Should fail because it tries to copy `src` across boundary
-
-### GDB Questions
->>>>>>> origin/master
 1. The name of the thread running is `main` and its address is 0xc000ee0c (from the stack pointer). The threads present at this time are:
     1. (current thread) dumplist #0: 0xc000e000 {tid = 1, status = THREAD\_RUNNING, name = &quot;main&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc000ee0c &quot;\210&quot;, &lt;incomplete sequence \357&gt;, priority = 31, allelem = {prev = 0xc0034b50 &lt;all\_list&gt;, next = 0xc0104020}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir = 0x0, magic = 3446325067}
     2. dumplist #1: 0xc0104000 {tid = 2, status = THREAD\_BLOCKED, name = &quot;idle&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc0104f34 &quot;&quot;, priority = 0, allelem = {prev = 0xc000e020, next = 0xc0034b58 &lt;all\_list+8&gt;}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir =0x0, magic = 3446325067}
