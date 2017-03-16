@@ -113,32 +113,32 @@ None needed
 3. Each file can be opened by multiple threads at once. However, each thread has its own `open_files_map` and `next_fd`, so each fd maps to a unique file per thread. When we call `open()` on a file, we create its `struct file` pointer in the thread stack, so each thread also has its own unique place in an open file.
 #### Rationale
 1. For most of the syscalls, we can use already implemented file operations. Since it&#39;s not recommended to modify the file and filesys files, we create a new struct to easily store the file and its `hash_elem`. We use a hash map to map file descriptors to files for constant access time, so it&#39;s faster than a linked list in which searching for a file would be in O(n) time. It also uses less space than a static array with a predefined size.
-#### Additional Questions
+### Additional Questions
 1. sc-bad-sp.c
-1. Line 18 moves the stack pointer to a bad address (about 64 MB below code segment)
+    * Line 18 moves the stack pointer to a bad address (about 64 MB below code segment)
 2. boundary.c
-1. Line 28 gets the page boundary and stores it in p
-2. Line 29 decrements p by:
-  1. If length of `src` is less than 4096, decrement p by the length divided by 2.
-  2. Else, decrement by 4096
-3. Line 30 attempts to write `src` at address p.
-4. Should fail because it tries to copy `src` across boundary
-5. GDB Questions
+    1. Line 28 gets the page boundary and stores it in p
+    2. Line 29 decrements p by:
+        * If length of `src` is less than 4096, decrement p by the length divided by 2.
+        * Else, decrement by 4096
+    3. Line 30 attempts to write `src` at address p.
+    4. Should fail because it tries to copy `src` across boundary
+#### GDB Questions
 1. The name of the thread running is `main` and its address is 0xc000ee0c (from the stack pointer). The threads present at this time are:
-1. (current thread) dumplist #0: 0xc000e000 {tid = 1, status = THREAD\_RUNNING, name = &quot;main&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc000ee0c &quot;\210&quot;, &lt;incomplete sequence \357&gt;, priority = 31, allelem = {prev = 0xc0034b50 &lt;all\_list&gt;, next = 0xc0104020}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir = 0x0, magic = 3446325067}
-2. dumplist #1: 0xc0104000 {tid = 2, status = THREAD\_BLOCKED, name = &quot;idle&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc0104f34 &quot;&quot;, priority = 0, allelem = {prev = 0xc000e020, next = 0xc0034b58 &lt;all\_list+8&gt;}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir =0x0, magic = 3446325067}
+    1. (current thread) dumplist #0: 0xc000e000 {tid = 1, status = THREAD\_RUNNING, name = &quot;main&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc000ee0c &quot;\210&quot;, &lt;incomplete sequence \357&gt;, priority = 31, allelem = {prev = 0xc0034b50 &lt;all\_list&gt;, next = 0xc0104020}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir = 0x0, magic = 3446325067}
+    2. dumplist #1: 0xc0104000 {tid = 2, status = THREAD\_BLOCKED, name = &quot;idle&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc0104f34 &quot;&quot;, priority = 0, allelem = {prev = 0xc000e020, next = 0xc0034b58 &lt;all\_list+8&gt;}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir =0x0, magic = 3446325067}
 2. The backtrace for the current thread is:
-1. #0  process\_execute (file\_name=file\_name@entry=0xc0007d50 &quot;args-none&quot;) at ../../userprog/process.c:32
-  * Called with line:288 `process_wait (process_execute (task))`
-2. #1  0xc002025e in run\_task (argv=0xc0034a0c &lt;argv+12&gt;) at ../../threads/init.c:288
-  * Called with line:340 `a-&gt;function (argv);`
-3. #2  0xc00208e4 in run\_actions (argv=0xc0034a0c &lt;argv+12&gt;) at ../../threads/init.c:340
-  * Called with line:133 `run_actions (argv)`
-4. #3  main () at ../../threads/init.c:133
+    1. #0  process\_execute (file\_name=file\_name@entry=0xc0007d50 &quot;args-none&quot;) at ../../userprog/process.c:32
+        * Called with line:288 `process_wait (process_execute (task))`
+    2. #1  0xc002025e in run\_task (argv=0xc0034a0c &lt;argv+12&gt;) at ../../threads/init.c:288
+        * Called with line:340 `a-&gt;function (argv);`
+    3. #2  0xc00208e4 in run\_actions (argv=0xc0034a0c &lt;argv+12&gt;) at ../../threads/init.c:340
+        * Called with line:133 `run_actions (argv)`
+    4. #3  main () at ../../threads/init.c:133
 3. The name of the thread running `start_process()` is `args-none` and its address is `0xc010afd4`. The threads present at this time are:
-1. dumplist #0: 0xc000e000 {tid = 1, status = THREAD\_BLOCKED, name = &quot;main&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc000eebc &quot;\001&quot;, priority= 31, allelem = {prev = 0xc0034b50 &lt;all\_list&gt;, next = 0xc0104020}, elem = {prev = 0xc0036554 &lt;temporary+4&gt;, next = 0xc003655c &lt;temporary+12&gt;}, pagedir = 0x0, magic = 3446325067}
-2. dumplist #1: 0xc0104000 {tid = 2, status = THREAD\_BLOCKED, name = &quot;idle&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc0104f34 &quot;&quot;, priority = 0, allelem = {prev = 0xc000e020, next = 0xc010a020}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir = 0x0, magic =3446325067}
-3. (current thread) dumplist #2: 0xc010a000 {tid = 3, status = THREAD\_RUNNING, name = &quot;args-none\000\000\000\000\000\000&quot;, stack = 0xc010afd4 &quot;&quot;, priority =31, allelem = {prev = 0xc0104020, next = 0xc0034b58 &lt;all\_list+8&gt;}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir= 0x0, magic = 3446325067}
+    1. dumplist #0: 0xc000e000 {tid = 1, status = THREAD\_BLOCKED, name = &quot;main&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc000eebc &quot;\001&quot;, priority= 31, allelem = {prev = 0xc0034b50 &lt;all\_list&gt;, next = 0xc0104020}, elem = {prev = 0xc0036554 &lt;temporary+4&gt;, next = 0xc003655c &lt;temporary+12&gt;}, pagedir = 0x0, magic = 3446325067}
+    2. dumplist #1: 0xc0104000 {tid = 2, status = THREAD\_BLOCKED, name = &quot;idle&quot;, &#39;\000&#39; &lt;repeats 11 times&gt;, stack = 0xc0104f34 &quot;&quot;, priority = 0, allelem = {prev = 0xc000e020, next = 0xc010a020}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir = 0x0, magic =3446325067}
+    3. (current thread) dumplist #2: 0xc010a000 {tid = 3, status = THREAD\_RUNNING, name = &quot;args-none\000\000\000\000\000\000&quot;, stack = 0xc010afd4 &quot;&quot;, priority =31, allelem = {prev = 0xc0104020, next = 0xc0034b58 &lt;all\_list+8&gt;}, elem = {prev = 0xc0034b60 &lt;ready\_list&gt;, next = 0xc0034b68 &lt;ready\_list+8&gt;}, pagedir= 0x0, magic = 3446325067}
 4. The thread running `start_process` is created at line:424 `function (aux)` in the `kernel_thread()` function.
 5. 0x0804870c caused the page fault.
 6. \_start (argc=&lt;error reading variable: can&#39;t compute CFA for this frame&gt;, argv=&lt;error reading variable: can&#39;t compute CFA for this frame&gt;) at ../../lib/user/entry.c:9, which is `exit (main (argc, argv))`
