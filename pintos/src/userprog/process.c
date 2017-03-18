@@ -14,6 +14,7 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
@@ -200,7 +201,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (const char *file_name, char *saveptr, void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -225,6 +226,20 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
+
+  // char *rest = file_name;
+  // char *token = strtok_r(rest, " ", &rest);
+  // memcpy(file_name, token, strlen(token) + 1);
+  // printf("-----------------------\n");
+  // printf("%s\n", file_name);
+  // printf("-----------------------\n");
+
+  char *saveptr;
+  file_name = strtok_r(file_name, " ", &saveptr);
+  // printf("-----------------------\n");
+  // printf("%s\n", file_name);
+  // printf("%s\n", saveptr);
+  // printf("-----------------------\n");
 
   /* Open executable file. */
   file = filesys_open (file_name);
@@ -307,7 +322,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (file_name, saveptr, esp))
     goto done;
 
   /* Start address. */
@@ -432,7 +447,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp)
+setup_stack (const char *file_name, char *saveptr, void **esp)
 {
   uint8_t *kpage;
   bool success = false;
@@ -446,6 +461,73 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
+  if (!success)
+    return success;
+
+  char *token = strtok_r(saveptr, " ", &saveptr);
+  int **argv = malloc(32 * sizeof(int*));
+  size_t argc = 0;
+  /* Round stack pointer down to a multiple of 4. */
+  if ((int) *esp % 4 != 0)
+    {
+      *esp -= (int) *esp % 4;
+    }
+
+  /* Save first pointer address */
+  size_t i;
+
+  /* Push arguments to stack */
+  while (token != NULL)
+    {
+      *esp -= strlen(token) + 1;
+      argv[argc] = &*esp; // want to get address of *esp
+      argc += 1;
+      memcpy(*esp, token, strlen(token) + 1);
+      token = strtok_r(NULL, " ", &saveptr);
+    }
+
+  /* Push argv[0] last to ensure that it is at the lowest virtual address. */
+  *esp -= strlen(file_name) + 1;
+  argv[argc] = &*esp;
+  memcpy(*esp, file_name, strlen(file_name) + 1);
+
+  // for debugging - print stack and check that all args are in stack
+  // hex_dump(esp, *esp, 32, true);
+
+  /* Check if word aligned */
+  int size = (int) *esp % 4 != 0;
+  if (size != 0)
+    {
+      *esp -= size;
+      memset(*esp, 0, size);
+    }
+
+  /* Push null pointer */
+  *esp -= 4;
+  memset(*esp, 0, 4);
+
+
+  /* Push address of each string to the stack */
+  // for (i = argc - 1; i > 0; i--)
+  for (i = 0; i <= argc; i++)
+    {
+      *esp -= 4;
+      // printf("%04x\n", *argv[i]);
+      memcpy(*esp, argv[i], 4);
+      // printf("-------i = %d---------------------\n", i);
+      // hex_dump(esp, *esp, 64, true);
+    }
+  /* Push argc */
+  *esp -= 3;
+  memset(*esp, 0, 3);
+  *esp -= 1;
+  memset(*esp, argc, 1);
+  /* Push dummy return address */
+  *esp -= 4;
+  memset(*esp, 0, 4);
+  // printf("-----------------------------\n");
+  // hex_dump(esp, *esp, 64, true);
+  free(argv);
   return success;
 }
 
