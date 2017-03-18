@@ -42,6 +42,9 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  char *saveptr;
+  file_name = strtok_r(file_name, " ", &saveptr);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
@@ -512,10 +515,7 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   for (i = 0; i <= argc; i++)
     {
       *esp -= 4;
-      // printf("%04x\n", *argv[i]);
       memcpy(*esp, argv[i], 4);
-      // printf("-------i = %d---------------------\n", i);
-      // hex_dump(esp, *esp, 64, true);
     }
   /* Push argc */
   *esp -= 3;
@@ -525,8 +525,7 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   /* Push dummy return address */
   *esp -= 4;
   memset(*esp, 0, 4);
-  // printf("-----------------------------\n");
-  // hex_dump(esp, *esp, 64, true);
+
   free(argv);
   return success;
 }
