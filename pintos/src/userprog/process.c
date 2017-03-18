@@ -42,6 +42,7 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  /* Get only the file name from argument */
   char *saveptr;
   file_name = strtok_r(file_name, " ", &saveptr);
 
@@ -230,19 +231,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  // char *rest = file_name;
-  // char *token = strtok_r(rest, " ", &rest);
-  // memcpy(file_name, token, strlen(token) + 1);
-  // printf("-----------------------\n");
-  // printf("%s\n", file_name);
-  // printf("-----------------------\n");
-
   char *saveptr;
   file_name = strtok_r(file_name, " ", &saveptr);
-  // printf("-----------------------\n");
-  // printf("%s\n", file_name);
-  // printf("%s\n", saveptr);
-  // printf("-----------------------\n");
 
   /* Open executable file. */
   file = filesys_open (file_name);
@@ -476,9 +466,6 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
       *esp -= (int) *esp % 4;
     }
 
-  /* Save first pointer address */
-  size_t i;
-
   /* Push arguments to stack */
   while (token != NULL)
     {
@@ -509,14 +496,14 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   *esp -= 4;
   memset(*esp, 0, 4);
 
-
   /* Push address of each string to the stack */
-  // for (i = argc - 1; i > 0; i--)
+  size_t i;
   for (i = 0; i <= argc; i++)
     {
       *esp -= 4;
       memcpy(*esp, argv[i], 4);
     }
+
   /* Push argc */
   *esp -= 3;
   memset(*esp, 0, 3);
