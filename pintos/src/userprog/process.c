@@ -501,18 +501,25 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   for (i = 0; i <= argc; i++)
     {
       *esp -= 4;
+      // printf("%04x\n", *argv[i]);
       memcpy(*esp, argv[i], 4);
+      // printf("-------i = %d---------------------\n", i);
+      // hex_dump(esp, *esp, 64, true);
     }
-
+  /* Push argv */
+  char *push_argv = &*esp;
+  *esp -= sizeof(char **);
+  memcpy(*esp, push_argv, sizeof(char **));
   /* Push argc */
   *esp -= 3;
-  memset(*esp, 0, 3);
+  // memset(*esp, 0, 3);
   *esp -= 1;
-  memset(*esp, argc, 1);
+  memset(*esp, &argc, 1);
   /* Push dummy return address */
   *esp -= 4;
   memset(*esp, 0, 4);
-
+  // printf("-----------------------------\n");
+  // hex_dump(esp, *esp, 64, true);
   free(argv);
   return success;
 }
