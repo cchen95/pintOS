@@ -462,11 +462,11 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   char **argv = malloc(64 * sizeof(char*));
   size_t argc = 0;
   /* Round stack pointer down to a multiple of 4. */
-  if ((int) *esp % 4 != 0)
-    {
-      *esp -= (int) *esp % 4;
-    }
-
+  // if ((int) *esp % 4 != 0)
+  //   {
+  //     *esp -= (int) *esp % 4;
+  //   }
+  //
   int i;
   argv[argc] = file_name; // argv[0] = file_name
   /* Store arguments so we could push onto stack in reverse order */
@@ -484,7 +484,7 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
     {
       token = argv[i];
       *esp -= strlen(token) + 1;
-      arg_addr[i] = &*esp; // want to get address of *esp
+      arg_addr[i] = *esp; // want to get address of *esp
       memcpy(*esp, token, strlen(token) + 1);
     }
   // DONT NEED
@@ -501,7 +501,6 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
       *esp -= size;
       memset(*esp, 0, size);
     }
-
   /* Push null pointer */
   *esp -= 4;
   argc += 1;
@@ -512,12 +511,12 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   for (i = argc - 1; i >= 0; i--)
     {
       *esp -= 4;
-      memcpy(*esp, arg_addr[i], 4);
+      memcpy(*esp, &arg_addr[i], 4);
     }
-  arg_addr[argc] = &*esp;
+  arg_addr[argc] = *esp;
   /* Push argv */
   *esp -= 4;
-  memcpy(*esp, arg_addr[argc], sizeof(char **));
+  memcpy(*esp, &arg_addr[argc], sizeof(char **));
   /* Push argc */
   *esp -= sizeof(int);
   memcpy(*esp, &argc, sizeof(int));
@@ -525,9 +524,10 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   *esp -= 4;
   memset(*esp, 0, 4);
   // for debugging - print stack and check that all args are in stack
-  hex_dump(*esp, *esp, 128, true);
+  // hex_dump(*esp, *esp, 128, true);
 
   free(argv);
+  return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
