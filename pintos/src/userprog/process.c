@@ -461,24 +461,18 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
   char **arg_addr = malloc(64 * sizeof(char*));
   char **argv = malloc(64 * sizeof(char*));
   size_t argc = 0;
-  /* Round stack pointer down to a multiple of 4. */
-  // if ((int) *esp % 4 != 0)
-  //   {
-  //     *esp -= (int) *esp % 4;
-  //   }
-  //
+
   int i;
-  argv[argc] = file_name; // argv[0] = file_name
+  argv[argc] = file_name;
+
   /* Store arguments so we could push onto stack in reverse order */
   while (token != NULL)
     {
-      // *esp -= strlen(token) + 1;
-      // arg_addr[argc] = &*esp; // want to get address of *esp
       argc += 1;
       argv[argc] = token;
-      // memcpy(*esp, token, strlen(token) + 1);
       token = strtok_r(NULL, " ", &saveptr);
     }
+
   /* Push arguments to stack */
   for (i = argc; i >= 0; i--)
     {
@@ -487,12 +481,6 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
       arg_addr[i] = *esp; // want to get address of *esp
       memcpy(*esp, token, strlen(token) + 1);
     }
-  // DONT NEED
-  /* Push argv[0] last to ensure that it is at the lowest virtual address. */
-  // *esp -= strlen(file_name) + 1;
-  // argv[argc] = file_name;
-  // arg_addr[argc] = &*esp;
-  // memcpy(*esp, file_name, strlen(file_name) + 1);
 
   /* Check if word aligned */
   int size = (int) *esp % 4 != 0;
@@ -501,32 +489,34 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
       *esp -= size;
       memset(*esp, 0, size);
     }
+
   /* Push null pointer */
   *esp -= 4;
   argc += 1;
   memset(*esp, 0, 4);
 
   /* Push address of each string to the stack */
-  // for (i = 0; i < argc; i++)
   for (i = argc - 1; i >= 0; i--)
     {
       *esp -= 4;
       memcpy(*esp, &arg_addr[i], 4);
     }
+
   arg_addr[argc] = *esp;
   /* Push argv */
   *esp -= 4;
   memcpy(*esp, &arg_addr[argc], sizeof(char **));
+
   /* Push argc */
   *esp -= sizeof(int);
   memcpy(*esp, &argc, sizeof(int));
+
   /* Push dummy return address */
   *esp -= 4;
   memset(*esp, 0, 4);
-  // for debugging - print stack and check that all args are in stack
-  // hex_dump(*esp, *esp, 128, true);
 
   free(argv);
+  free(arg_addr);
   return success;
 }
 
