@@ -19,6 +19,7 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
+typedef int pid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
 /* Thread priorities. */
@@ -98,11 +99,25 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct childProc *proc;
+    struct list children;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+struct childProc
+  {
+    pid_t pid;
+    struct file *exe;
+    bool loaded;
+    struct list_elem elem;
+    struct semaphore sema;
+    int exit_status;
+  };
+
+struct childProc *get_child_process(pid_t pid);
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

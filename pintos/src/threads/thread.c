@@ -198,6 +198,17 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+#ifdef USERPROG
+  struct childProc *cp = malloc (sizeof (struct childProc));
+  cp->pid = tid;
+  cp->exe = NULL;
+  cp->loaded = false;
+  sema_init (&cp->sema, 0);
+  cp->exit_status = -1;
+  list_push_back (&running_thread ()->children, &cp->elem);
+  t->proc = cp;
+#endif
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -582,3 +593,19 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+struct childProc *get_child_process(pid_t pid)
+{
+  struct thread *cur = thread_current();
+  struct list *list = &cur->children;
+  struct list_elem *e = list_head(list);
+  while((e = list_next(e)) != list_tail(list))
+  {
+    struct childProc *cp = list_entry (e, struct childProc, elem);
+    if(cp->pid == pid)
+    {
+      return cp;
+    }
+  }
+  return NULL;
+}
