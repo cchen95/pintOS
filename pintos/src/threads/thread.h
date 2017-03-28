@@ -91,9 +91,6 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-    int64_t time_to_wake;               /* Time that a sleeping thread should wake */
-    int nice;                           /* Niceness value */
-    fixed_point_t recent_cpu;           /* Recent CPU */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -105,10 +102,6 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-
-    int base_priority;
-    struct list held_locks;
-    struct lock *blocked_by;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -139,21 +132,12 @@ void thread_yield (void);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
-void thread_update_priority_cpu (struct thread *t, void *aux);
-
 int thread_get_priority (void);
 void thread_set_priority (int);
-
-int mlfqs_get_priority (struct thread *t);
-fixed_point_t mlfqs_get_recent_cpu (struct thread *t);
-fixed_point_t mlfqs_load_avg (void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
-void thread_donate_priority(struct thread *);
-void thread_update_priorities (struct thread *);
 
 #endif /* threads/thread.h */
