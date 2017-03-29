@@ -7,11 +7,23 @@
 #include "filesys/filesys.h"
 
 static void syscall_handler (struct intr_frame *);
+void check_ptr (void *ptr, size_t size);
 
 void
 syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+}
+
+void check_ptr (void *ptr, size_t size) {
+  if (is_user_vaddr (ptr) && pagedir_get_page (thread_current ()->pagedir, ptr) != NULL && is_user_vaddr (ptr + size) && pagedir_get_page (thread_current ()->pagedir, ptr + size) != NULL)
+  {
+    return;
+  }
+  else
+  {
+    thread_exit();
+  }
 }
 
 static void
