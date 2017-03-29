@@ -5,6 +5,14 @@
 #include "threads/thread.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "threads/vaddr.h"
+#include "userprog/process.h"
+#include "userprog/pagedir.h"
+#include <string.h>
+#include "threads/malloc.h"
+#include "devices/shutdown.h"
+#include "devices/input.h"
+#include "threads/init.h"
 
 static void syscall_handler (struct intr_frame *);
 void check_ptr (void *ptr, size_t size);
@@ -45,13 +53,28 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   check_ptr (args, sizeof (uint32_t));
   check_ptr (&args[1], sizeof (uint32_t));
+  check_string ((char *) args[1]);
 
   switch (args[0])
     {
+      case SYS_PRACTICE:
+        f->eax = args[1] + 1;
+        break;
+      case SYS_WAIT:
+        f->eax = process_wait (args[1]);
+        break;
+      case SYS_HALT:
+        shutdown_power_off ();
+        break;
+      case SYS_EXEC:
+        f->eax = process_execute ((char *) args[1]);
+        break;
       case SYS_EXIT:
         f->eax = args[1];
         printf("%s: exit(%d)\n", &thread_current ()->name, args[1]);
-        thread_exit();
+        thread_current ()->proc->exit_status = args[1];
+        thread_exit ();
+        break;
       case SYS_WRITE:
         if (args[1] == STDOUT_FILENO)
           {
