@@ -101,6 +101,8 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct childProc *proc;
     struct list children;
+    struct list file_list;
+    int next_fd;
 #endif
 
     /* Owned by thread.c. */
