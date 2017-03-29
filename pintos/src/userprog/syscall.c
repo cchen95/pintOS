@@ -42,6 +42,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   uint32_t* args = ((uint32_t*) f->esp);
   // printf("System call number: %d\n", args[0]);
+
+  check_ptr (args, sizeof (uint32_t));
+  check_ptr (&args[1], sizeof (uint32_t));
+
   switch (args[0])
     {
       case SYS_EXIT:
