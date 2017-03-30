@@ -19,7 +19,6 @@ void check_ptr (void *ptr, size_t size);
 void check_string (char *ptr);
 struct lock file_lock;
 struct file_pointer *get_file (int fd);
-struct file_pointer *get_file (int fd);
 
 void
 syscall_init (void)
