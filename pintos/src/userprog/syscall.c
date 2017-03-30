@@ -98,7 +98,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_EXIT:
     {
-      printf("%s: exit(%d)\n", &thread_current ()->name, args[1]);
+      // printf("%s: exit(%d)\n", &thread_current ()->name, args[1]);
       thread_current ()->proc->exit_status = args[1];
       thread_exit ();
       break;
