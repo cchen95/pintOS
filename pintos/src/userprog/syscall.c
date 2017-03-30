@@ -8,6 +8,7 @@
 
 static void syscall_handler (struct intr_frame *);
 void check_ptr (void *ptr, size_t size);
+void check_string (char *ptr);
 
 void
 syscall_init (void)
@@ -24,6 +25,16 @@ void check_ptr (void *ptr, size_t size) {
   {
     thread_exit();
   }
+}
+
+void check_string (char *ustr) {
+  if (is_user_vaddr (ustr)) {
+    char *kstr = pagedir_get_page (thread_current ()->pagedir, ustr);
+    if (kstr != NULL && is_user_vaddr (ustr + strlen (kstr) + 1) &&
+      pagedir_get_page (thread_current ()->pagedir, (ustr + strlen (kstr) + 1)) != NULL)
+      return;
+  }
+  thread_exit ();
 }
 
 static void
