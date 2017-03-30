@@ -62,6 +62,24 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  size_t function_size = strlen (file_name) + 1;
+  char **argv = malloc(64*sizeof(char*));
+  size_t argc = 0;
+  char *save_ptr;
+
+  char *token = strtok_r (file_name, " ", &save_ptr);
+
+  argv[argc] = file_name;
+  int offset = PHYS_BASE - function_size - file_name_;
+
+  while (token != NULL)
+  {
+    argv[argc++] = token + offset;
+    token = strtok_r (NULL, " ", &save_ptr);
+  }
+
+  argv[argc] = NULL;
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -70,9 +88,28 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
   if (!success)
     thread_exit ();
+
+  if_.esp -= function_size;
+  memcpy(if_.esp, file_name_, function_size);
+
+  size_t argv_sz = (argc + 1) * sizeof (char *);
+
+  int size = (int) ((unsigned)if_.esp % 4);
+  if (size != 0)
+  {
+    if_.esp -= size + argv_sz;
+  }
+  if_.esp -= argv_sz;
+  memcpy (if_.esp, argv, argv_sz);
+
+  *((char ***) (if_.esp - 4)) = if_.esp;
+  *((int *) (if_.esp - 8)) = argc;
+  if_.esp -= 12;
+
+//below maybe should use file_name_ or just file_name?
+  palloc_free_page (file_name);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -205,7 +242,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (const char *file_name, char *saveptr, void **esp);
+static bool setup_stack (void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -315,7 +352,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (file_name, saveptr, esp))
+  if (!setup_stack (esp))
     goto done;
 
   /* Start address. */
@@ -440,7 +477,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (const char *file_name, char *saveptr, void **esp)
+setup_stack (void **esp)
 {
   uint8_t *kpage;
   bool success = false;
@@ -454,69 +491,6 @@ setup_stack (const char *file_name, char *saveptr, void **esp)
       else
         palloc_free_page (kpage);
     }
-  if (!success)
-    return success;
-
-  char *token = strtok_r(saveptr, " ", &saveptr);
-  char **arg_addr = malloc(64 * sizeof(char*));
-  char **argv = malloc(64 * sizeof(char*));
-  size_t argc = 0;
-
-  int i;
-  argv[argc] = file_name;
-
-  /* Store arguments so we could push onto stack in reverse order */
-  while (token != NULL)
-    {
-      argc += 1;
-      argv[argc] = token;
-      token = strtok_r(NULL, " ", &saveptr);
-    }
-
-  /* Push arguments to stack */
-  for (i = argc; i >= 0; i--)
-    {
-      token = argv[i];
-      *esp -= strlen(token) + 1;
-      arg_addr[i] = *esp; // want to get address of *esp
-      memcpy(*esp, token, strlen(token) + 1);
-    }
-
-  /* Check if word aligned */
-  int size = (int) *esp % 4 != 0;
-  if (size != 0)
-    {
-      *esp -= size;
-      memset(*esp, 0, size);
-    }
-
-  /* Push null pointer */
-  *esp -= 4;
-  argc += 1;
-  memset(*esp, 0, 4);
-
-  /* Push address of each string to the stack */
-  for (i = argc - 1; i >= 0; i--)
-    {
-      *esp -= 4;
-      memcpy(*esp, &arg_addr[i], 4);
-    }
-
-  arg_addr[argc] = *esp;
-  /* Push argv */
-  *esp -= 4;
-  memcpy(*esp, &arg_addr[argc], sizeof(char **));
-
-  /* Push argc */
-  *esp -= sizeof(int);
-  memcpy(*esp, &argc, sizeof(int));
-
-  /* Push dummy return address */
-  *esp -= 4;
-  memset(*esp, 0, 4);
-
-  free(argv);
-  free(arg_addr);
   return success;
 }
 
