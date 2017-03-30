@@ -40,12 +40,15 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  /* Get only the file name from argument */
-  char *saveptr;
-  file_name = strtok_r(file_name, " ", &saveptr);
+  /* Get only the file name from argument  - strtok_r giving some bugs*/
+  // char *saveptr;
+  // file_name = strtok_r(file_name, " ", &saveptr);
+  size_t name_len = strcspn (file_name, " ") + 1;
+  char *name = malloc (name_len * sizeof (char));
+  strlcpy (name, file_name, name_len);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   
@@ -162,6 +165,8 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  file_close (cur->proc->exe);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -183,6 +188,13 @@ process_exit (void)
     {
       struct list_elem *e = list_pop_front (&cur->children);
       free (list_entry (e, struct childProc, elem));
+    }
+  while (!list_empty (&cur->file_list))
+    {
+      struct list_elem *e = list_pop_front (&cur->file_list);
+      struct file_pointer *f = list_entry (e, struct file_pointer, elem);
+      file_close (f->file);
+      free (f);
     }
 
   sema_up (&cur->proc->sema);
@@ -292,9 +304,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
-
-  char *saveptr;
-  file_name = strtok_r(file_name, " ", &saveptr);
 
   /* Open executable file. */
   file = filesys_open (file_name);
