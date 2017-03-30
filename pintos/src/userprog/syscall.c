@@ -23,6 +23,7 @@ struct file_pointer *get_file (int fd);
 void
 syscall_init (void)
 {
+  lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -65,6 +66,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t* args = ((uint32_t*) f->esp);
   // printf("System call number: %d\n", args[0]);
 
+  check_ptr (args, sizeof (uint32_t));
   switch (args[0]) {
     case SYS_READ: case SYS_WRITE:
       check_ptr (&args[3], sizeof (uint32_t));
