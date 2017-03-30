@@ -52,6 +52,8 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   
+  free (name);
+
   struct childProc *cp = get_child_process (tid);
   sema_down (&cp->sema);
   if (cp->loaded)
@@ -121,6 +123,10 @@ start_process (void *file_name_)
 
 //below maybe should use file_name_ or just file_name?
   palloc_free_page (file_name);
+
+  struct childProc *cp = thread_current ()->proc;
+  cp->loaded = true;
+  sema_up (&cp->sema);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
