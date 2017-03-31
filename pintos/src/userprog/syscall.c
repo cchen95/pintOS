@@ -108,7 +108,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_READ:
     {
-      if (args[1] == 0)
+      if (args[1] == STDIN_FILENO)
       {
         uint8_t *buffer = (uint8_t *) args[2];
         size_t i = 0;
@@ -119,10 +119,19 @@ syscall_handler (struct intr_frame *f UNUSED)
         }
         f->eax = i;
       }
+      else if (args[1] == STDOUT_FILENO)
+      {
+        f->eax = 0;
+      }
       else
       {
         lock_acquire (&file_lock);
         struct file_pointer *fn = get_file (args[1]);
+        if (fn == NULL)
+          {
+            lock_release (&file_lock);
+            break;
+          }
         f->eax = file_read (fn->file, (void *) args[2], args[3]);
         lock_release (&file_lock);
       }
@@ -130,15 +139,24 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_WRITE:
     {
-      if (args[1] == 1)
+      if (args[1] == STDOUT_FILENO)
       {
         putbuf ((void *) args[2], args[3]);
         f->eax = args[3];
+      }
+      else if (args[1] == STDIN_FILENO)
+      {
+        f->eax = 0;
       }
       else
       {
         lock_acquire (&file_lock);
         struct file_pointer *fn = get_file (args[1]);
+        if (fn == NULL)
+          {
+            lock_release (&file_lock);
+            break;
+          }
         f->eax = file_write (fn->file, (void *) args[2], args[3]);
         lock_release (&file_lock);
       }
@@ -204,8 +222,17 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_CLOSE:
     {
+      if (args[1] == STDOUT_FILENO || args[1] == STDIN_FILENO)
+        {
+          break;
+        }
       lock_acquire(&file_lock);
       struct file_pointer *fn = get_file (args[1]);
+      if (fn == NULL)
+        {
+          lock_release (&file_lock);
+          break;
+        }
       file_close (fn->file);
       list_remove (&fn->elem);
       free (fn);
