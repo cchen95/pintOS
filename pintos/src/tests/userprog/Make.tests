@@ -12,7 +12,7 @@ open-null open-bad-ptr open-twice close-normal close-twice close-stdin	\
 close-stdout close-bad-fd read-normal read-bad-ptr read-boundary	\
 read-zero read-stdout read-bad-fd write-normal write-bad-ptr		\
 write-boundary write-zero write-stdin write-bad-fd exec-once exec-arg	\
-exec-multiple exec-missing exec-bad-ptr wait-simple wait-twice		\
+exec-multiple exec-missing exec-bad-ptr wait-simple wait-twice wait-childterm		\
 wait-killed wait-bad-pid multi-recurse multi-child-fd rox-simple	\
 rox-child rox-multichild bad-read bad-write bad-read2 bad-write2        \
 bad-jump bad-jump2 iloveos practice)
@@ -84,6 +84,7 @@ tests/userprog/exec-missing_SRC = tests/userprog/exec-missing.c tests/main.c
 tests/userprog/exec-bad-ptr_SRC = tests/userprog/exec-bad-ptr.c tests/main.c
 tests/userprog/wait-simple_SRC = tests/userprog/wait-simple.c tests/main.c
 tests/userprog/wait-twice_SRC = tests/userprog/wait-twice.c tests/main.c
+tests/userprog/wait-childterm_SRC = tests/userprog/wait-childterm.c tests/main.c
 tests/userprog/wait-killed_SRC = tests/userprog/wait-killed.c tests/main.c
 tests/userprog/wait-bad-pid_SRC = tests/userprog/wait-bad-pid.c tests/main.c
 tests/userprog/multi-recurse_SRC = tests/userprog/multi-recurse.c
@@ -95,6 +96,7 @@ tests/userprog/rox-multichild_SRC = tests/userprog/rox-multichild.c	\
 tests/main.c
 
 tests/userprog/child-simple_SRC = tests/userprog/child-simple.c
+tests/userprog/child-waitparent_SRC = tests/userprog/child-waitparent.c
 tests/userprog/child-args_SRC = tests/userprog/args.c
 tests/userprog/child-bad_SRC = tests/userprog/child-bad.c tests/main.c
 tests/userprog/child-close_SRC = tests/userprog/child-close.c
@@ -127,6 +129,7 @@ tests/userprog/exec-once_PUTFILES += tests/userprog/child-simple
 tests/userprog/exec-multiple_PUTFILES += tests/userprog/child-simple
 tests/userprog/wait-simple_PUTFILES += tests/userprog/child-simple
 tests/userprog/wait-twice_PUTFILES += tests/userprog/child-simple
+tests/userprog/wait-childterm_PUTFILES += tests/userprog/child-simple
 
 tests/userprog/exec-arg_PUTFILES += tests/userprog/child-args
 tests/userprog/multi-child-fd_PUTFILES += tests/userprog/child-close
