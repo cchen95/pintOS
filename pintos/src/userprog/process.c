@@ -41,8 +41,6 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Get only the file name from argument  - strtok_r giving some bugs*/
-  // char *saveptr;
-  // file_name = strtok_r(file_name, " ", &saveptr);
   size_t name_len = strcspn (file_name, " ") + 1;
   char *name = malloc (name_len * sizeof (char));
   strlcpy (name, file_name, name_len);
@@ -121,7 +119,6 @@ start_process (void *file_name_)
   *((int *) (if_.esp - 8)) = argc;
   if_.esp -= 12;
 
-//below maybe should use file_name_ or just file_name?
   palloc_free_page (file_name);
 
   struct childProc *cp = thread_current ()->proc;
@@ -161,7 +158,6 @@ process_wait (tid_t child_tid)
     list_remove (&cp->elem);
     return cp->exit_status;
   }
-  //should i free cp?
 }
 
 /* Free the current process's resources. */
@@ -405,7 +401,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  // file_close (file);
   return success;
 }
 
