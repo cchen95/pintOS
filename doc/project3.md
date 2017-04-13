@@ -151,7 +151,7 @@ Might need to split new logic in `free_map_allocate` to a new function as well, 
 	* Call `dir_readdir()` where `*dir` is the directory corresponding to `fd` and `name[NAME_MAX + 1]` is `*name`, while `name` is not “.” or “..”
 * `bool isdir (int fd)`
 	* Call `get_file(fd)` and check corresponding `file_pointer->is_dir`
-`int inumber (int fd)`
+* `int inumber (int fd)`
 	* Call `get_file(fd)` to get corresponding `struct file_pointer` and check `is_dir` field
 	* If directory, call `dir_get_inode()` on `file_pointer->dir` and call `inode_get_inumber()`
 	* If file call `file_get_inode` on `file_pointer->file` and call `inode_get_inumber()`
