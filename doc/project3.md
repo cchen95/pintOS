@@ -117,23 +117,22 @@ Might need to split new logic in `free_map_allocate` to a new function as well, 
 * Set `wd->dir` of first user process to root directory by calling `dir_open_root()`
 * Set `wd->dir` of other user processes to by calling `dir_reopen()` on parent’s `wd->dir`
 
-##### Helper function `struct dir *find_dir(const char *filepath, char **filename)`
+##### Helper functions 
 
-* Parse input file path with `get_next_part()` (given code in spec) to get components
-* For each component call `dir_lookup(curr_dir, component, **inode)` to get its inode if it exists, and use `dir_open()` on inode to get matching `struct dir` to look through next 
-	* `curr_dir` starts from `wd` or root depending on absolute or relative path
-* Sets `filename` to be last component of filepath
-* Returns NULL if any component in the path cannot be found
-
-##### Resolving paths
-
-* For syscalls with input `char *` file or dir arguments, check if first character is  ‘/’, which indicates it is an absolute path
-* Search for files or dirs starting from `wd` if relative or root if absolute
-* Special characters 
-	* `../` - get parent directory and search starting from there
-	* `./` - start from `wd`
+* `struct dir *find_dir(const char *filepath, char **filename)`
+	* Parse input file path with `get_next_part()` (given code in spec) to get components
+	* For each component call `dir_lookup(curr_dir, component, **inode)` to get its inode if it exists, and use `dir_open()` on inode to get matching `struct dir` to look through next 
+		* `curr_dir` starts from `wd` or root depending on absolute or relative path
+	* Sets `filename` to be last component of filepath
+	* Returns NULL if any component in the path cannot be found
+	* Resolving paths
+		* For syscalls with input `char *` file or dir arguments, check if first character is  ‘/’, which indicates it is an absolute path
+		* Search for files or dirs starting from `wd` if relative or root if absolute
+		* Special characters 
+			* `../` - get parent directory and search starting from there
+			* `./` - start from `wd`
 * `bool can_use(struct *inode)` (used for synchronization)
-* Follow inode parent pointers to make sure itself and no parent directory is `in_use`, and that `sub_use` for current level is false (checks whether operations are happening at a lower level), and return true if nothing is in use
+	* Follow inode parent pointers to make sure itself and no parent directory is `in_use`, and that `sub_use` for current level is false (checks whether operations are happening at a lower level), and return true if nothing is in use
 
 ##### New syscalls: modify `syscall.c` for syscall handling
 
