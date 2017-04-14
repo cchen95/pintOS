@@ -64,7 +64,6 @@ static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
   uint32_t* args = ((uint32_t*) f->esp);
-  // printf("System call number: %d\n", args[0]);
 
   check_ptr (args, sizeof (uint32_t));
   switch (args[0]) {
@@ -98,7 +97,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_EXIT:
     {
-      // printf("%s: exit(%d)\n", &thread_current ()->name, args[1]);
       thread_current ()->proc->exit_status = args[1];
       thread_exit ();
       break;
