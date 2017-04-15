@@ -2,6 +2,7 @@
 #include <debug.h>
 #include <stdio.h>
 #include <string.h>
+#include "filesys/cache.h"
 #include "filesys/file.h"
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
@@ -22,6 +23,7 @@ filesys_init (bool format)
     PANIC ("No file system device found, can't initialize file system.");
 
   inode_init ();
+  cache_init ();
   free_map_init ();
 
   if (format)
@@ -35,6 +37,7 @@ filesys_init (bool format)
 void
 filesys_done (void)
 {
+  free_cache ();
   free_map_close ();
 }
 
@@ -98,6 +101,7 @@ do_format (void)
   free_map_create ();
   if (!dir_create (ROOT_DIR_SECTOR, 16))
     PANIC ("root directory creation failed");
+  // free_cache ();
   free_map_close ();
   printf ("done.\n");
 }
