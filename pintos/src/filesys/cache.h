@@ -7,7 +7,7 @@
 void cache_init (void);
 struct cache_block *init_cache_block (block_sector_t sector);
 struct cache_block *find_cache_block (block_sector_t sector);
-struct cache_block *evict_block (void);
+void evict_block (void);
 void update_lru (struct cache_block *cb);
 uint8_t *read_cache_block (block_sector_t sector);
 uint8_t *write_cache_block (block_sector_t sector);
