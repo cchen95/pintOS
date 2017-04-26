@@ -8,6 +8,8 @@
 #include "threads/synch.h"
 
 #include <stdio.h>
+#define CACHE_SIZE 64
+
 struct cache_block
   {
     int dirty;                        /* Dirty bit */
@@ -29,6 +31,24 @@ cache_init (void)
 {
   list_init (&cache_list);
   lock_init (&cache_lock);
+
+  int i;
+  struct cache_block *cb;
+  lock_acquire (&cache_lock);
+  for (i = 0; i < CACHE_SIZE; i++)
+    {
+      cb = malloc (sizeof (struct cache_block));
+      if (cb == NULL)
+        {
+          free (cb);
+          return;
+        }
+      cb->dirty = 0;
+      cb->sector = 0;
+      lock_init (&cb->block_lock);
+      list_push_front (&cache_list, &cb->elem);
+    }
+  lock_release (&cache_lock);
 }
 
 /* Initializes struct cache_block. */
@@ -50,10 +70,15 @@ init_cache_block (block_sector_t sector)
 void
 free_cache (void)
 {
+  struct list_elem *e;
+  struct cache_block *cb;
   lock_acquire (&cache_lock);
   while (!list_empty (&cache_list))
     {
-      evict_block ();
+      e = list_pop_back (&cache_list);
+      cb = list_entry (e, struct cache_block, elem);
+      evict_block (cb);
+      free (cb);
     }
   lock_release (&cache_lock);
 }
@@ -81,32 +106,24 @@ find_cache_block (block_sector_t sector)
 
 /* Evict last block in cache_list. */
 void
-evict_block (void)
+evict_block (struct cache_block *cb)
 {
-  if (list_empty (&cache_list))
-    return;
-  struct list_elem *e = list_pop_back (&cache_list);
-  struct cache_block *cb = list_entry(e, struct cache_block, elem);
   lock_acquire (&cb->block_lock);
   if (cb->dirty)
     {
       block_write(fs_device, cb->sector, cb->data);
     }
   lock_release (&cb->block_lock);
-  free(cb);
 }
 
 
 /* Updates cache_list using LRU policy.
-   Removes elem from list first if in_list == 1.
-   Then pushes elem to front of the list. */
+*/
 void
 update_lru (struct cache_block *cb)
 {
-  struct cache_block *found = find_cache_block (cb->sector);
   lock_acquire (&cache_lock);
-  if (found != NULL)
-    list_remove (&found->elem);
+  list_remove (&cb->elem);
   list_push_front (&cache_list, &cb->elem);
   lock_release (&cache_lock);
 }
@@ -116,23 +133,29 @@ struct cache_block *
 get_data (block_sector_t sector)
 {
   struct cache_block *cb = find_cache_block(sector);
+  if (cb)
+      update_lru (cb);
   if (!cb)
     {
       lock_acquire (&cache_lock);
-      if (list_size (&cache_list) >= 64)
-        {
-          evict_block ();
-        }
+      struct list_elem *e = list_pop_back (&cache_list);
+      cb = list_entry (e, struct cache_block, elem);
       lock_release (&cache_lock);
-      cb = init_cache_block (sector);
-      if (cb == NULL)
-          return NULL;
+
+      /* Check if block is dirty and write to disk. */
+      evict_block (cb);
+
       /* Load in new block from disk into cb->data. */
       lock_acquire (&cb->block_lock);
       block_read (fs_device, sector, cb->data);
       cb->dirty = 0;
       cb->sector = sector;
       lock_release (&cb->block_lock);
+
+      /* Push block back to list */
+      lock_acquire (&cache_lock);
+      list_push_front (&cache_list, &cb->elem);
+      lock_release (&cache_lock);
     }
   return cb;
 }
@@ -143,8 +166,6 @@ read_cache_block (block_sector_t sector)
   struct cache_block *cb = get_data (sector);
   if (cb == NULL)
     return NULL;
-
-  update_lru (cb);
   return cb->data;
 }
 
@@ -162,7 +183,5 @@ write_cache_block (block_sector_t sector)
   cb->dirty = 1;
 
   lock_release (&cb->block_lock);
-
-  update_lru (cb);
   return cb->data;
 }
