@@ -103,6 +103,7 @@ struct thread
     struct list children;
     struct list file_list;
     int next_fd;
+    struct dir *wd;                     /* Working directory. */
 #endif
 
     /* Owned by thread.c. */

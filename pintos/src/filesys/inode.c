@@ -6,6 +6,7 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -37,6 +38,12 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
+    bool is_dir;                        /* Directory or file */
+    struct inode *parent;               /* Containing directory */
+    bool in_use;                        /* Whole file/directory in use */
+    int user_cnt;                       /* Number of users, < 0: inode in use, > 0: sub use */
+    struct lock lock;                   /* Lock */
+    struct condition cv;                /* Condition variable */
   };
 
 /* Returns the block device sector that contains byte offset POS
@@ -137,6 +144,10 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  cond_init(&inode->cv);
+  lock_init(&inode->lock);
+  inode->user_cnt = 0;
+  inode->parent = NULL;
   block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
@@ -342,4 +353,63 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+void
+inode_add_user (struct inode *inode, bool in_use)
+{
+  /* Whole file or directory operation */
+  if (in_use)
+  {
+    lock_acquire (&inode->lock);
+    while (inode->user_cnt != 0)
+    {
+      cond_wait (&inode->cv, &inode->lock);
+    }
+    inode->user_cnt = -1;
+    cond_signal (&inode->cv, &inode->lock);
+    lock_release (&inode->lock);
+  }
+
+  /* Go through parents and increment number of sub users */
+  struct inode *in = inode->parent;
+  while (in != NULL)
+  {
+    lock_acquire (&in->lock);
+    while (in->user_cnt < 0)
+    {
+      cond_wait (&in->cv, &in->lock);
+    }
+    in->user_cnt++;
+    cond_signal (&in->cv, &in->lock);
+    lock_release (&in->lock);
+
+    in = in->parent;
+  }
+}
+
+void
+inode_remove_user (struct inode *inode, bool in_use)
+{
+  /* If current inode in use, no other process could have used it
+     so just reset user_cnt to 0
+  */
+  if (in_use)
+  {
+    lock_acquire (&inode->lock);
+    inode->user_cnt = 0;
+    cond_signal (&inode->cv, &inode->lock);
+    lock_release (&inode->lock);
+  }
+
+  struct inode *in = inode->parent;
+  while (in != NULL)
+  {
+    lock_acquire (&in->lock);
+    in->user_cnt--;
+    cond_signal (&in->cv, &in->lock);
+    lock_release (&in->lock);
+    in = in->parent;
+  }
+
 }

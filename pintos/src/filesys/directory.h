@@ -28,6 +28,6 @@ bool dir_remove (struct dir *, const char *name);
 bool dir_readdir (struct dir *, char name[NAME_MAX + 1]);
 
 /* Helper functions for extracting filenames and dirs from a filepath */
-struct dir *dir_find(const char *filepath, char filename[]);
+struct dir *dir_find(struct dir *dir, const char *filepath, char filename[]);
 
 #endif /* filesys/directory.h */

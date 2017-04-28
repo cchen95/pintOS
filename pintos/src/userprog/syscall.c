@@ -5,6 +5,7 @@
 #include "threads/thread.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/directory.h"
 #include "threads/vaddr.h"
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
@@ -19,6 +20,7 @@ void check_ptr (void *ptr, size_t size);
 void check_string (char *ptr);
 struct lock file_lock;
 struct file_pointer *get_file (int fd);
+struct dir *get_dir(const char *filepath);
 
 void
 syscall_init (void)
@@ -27,7 +29,9 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-void check_ptr (void *ptr, size_t size) {
+void
+check_ptr (void *ptr, size_t size)
+{
   if (is_user_vaddr (ptr) && pagedir_get_page (thread_current ()->pagedir, ptr) != NULL && is_user_vaddr (ptr + size) && pagedir_get_page (thread_current ()->pagedir, ptr + size) != NULL)
   {
     return;
@@ -38,7 +42,9 @@ void check_ptr (void *ptr, size_t size) {
   }
 }
 
-void check_string (char *ustr) {
+void
+check_string (char *ustr)
+{
   if (is_user_vaddr (ustr)) {
     char *kstr = pagedir_get_page (thread_current ()->pagedir, ustr);
     if (kstr != NULL && is_user_vaddr (ustr + strlen (kstr) + 1) &&
@@ -48,7 +54,9 @@ void check_string (char *ustr) {
   thread_exit ();
 }
 
-struct file_pointer *get_file (int fd) {
+struct file_pointer *
+get_file (int fd)
+{
   struct list *list_ = &thread_current ()->file_list;
   struct list_elem *e = list_head (list_);
   while ((e = list_next(e)) != list_tail(list_))
@@ -57,6 +65,30 @@ struct file_pointer *get_file (int fd) {
     if (f->fd == fd)
     return f;
   }
+  return NULL;
+}
+
+struct dir *
+get_dir(const char *filepath)
+{
+  if (filepath == NULL) return NULL;
+
+  struct dir *curr_dir;
+  char filename[NAME_MAX + 1];
+
+  if (filepath[0] == '/')
+    curr_dir = dir_open_root();
+  else
+    curr_dir = thread_current()->wd;
+
+  struct dir *dir = dir_find(curr_dir, filepath, filename);
+
+  struct inode *inode = NULL;
+  bool found_dir = dir_lookup(dir, filename, &inode);
+
+  if (found_dir)
+    return dir_open(inode);
+
   return NULL;
 }
 
@@ -224,7 +256,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         {
           break;
         }
-      lock_acquire(&file_lock);
+      lock_acquire (&file_lock);
       struct file_pointer *fn = get_file (args[1]);
       if (fn == NULL)
         {
@@ -235,6 +267,27 @@ syscall_handler (struct intr_frame *f UNUSED)
       list_remove (&fn->elem);
       free (fn);
       lock_release (&file_lock);
+      break;
+    }
+    case SYS_CHDIR:
+    {
+      struct dir *dir = get_dir ((char *) args[1]);
+      break;
+    }
+    case SYS_MKDIR:
+    {
+      break;
+    }
+    case SYS_READDIR:
+    {
+      break;
+    }
+    case SYS_ISDIR:
+    {
+      break;
+    }
+    case SYS_INUMBER:
+    {
       break;
     }
   }

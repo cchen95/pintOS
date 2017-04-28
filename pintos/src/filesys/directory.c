@@ -266,7 +266,23 @@ get_next_part (char part[NAME_MAX + 1], const char **srcp)
 }
 
 struct dir *
-dir_find(const char *filepath, char filename[])
+dir_find(struct dir *dir, const char *filepath, char filename[])
 {
-  return NULL;
+  if (filepath == NULL) return NULL;
+
+  // char name[NAME_MAX + 1];
+  struct inode *inode = NULL;
+  struct dir *curr_dir = dir;
+
+  int n;
+  while ((n = get_next_part(filename, &filepath)) == 1) {
+    bool found_dir = dir_lookup(curr_dir, filename, &inode);
+    if (!found_dir) return NULL;
+
+    curr_dir = dir_open(inode);
+  }
+
+  if (n == -1) return NULL;
+
+  return curr_dir;
 }
