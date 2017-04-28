@@ -19,14 +19,12 @@
 static void syscall_handler (struct intr_frame *);
 void check_ptr (void *ptr, size_t size);
 void check_string (char *ptr);
-struct lock file_lock;
 struct file_pointer *get_file (int fd);
 struct dir *get_dir(const char *filepath);
 
 void
 syscall_init (void)
 {
-  lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -143,11 +141,12 @@ syscall_handler (struct intr_frame *f UNUSED)
       {
         uint8_t *buffer = (uint8_t *) args[2];
         size_t i = 0;
-        while (i < args[3]) {
-          buffer[i] = input_getc ();
-          if (buffer[i++] == '\n')
-            break;
-        }
+        while (i < args[3])
+          {
+            buffer[i] = input_getc ();
+            if (buffer[i++] == '\n')
+              break;
+          }
         f->eax = i;
       }
       else if (args[1] == STDOUT_FILENO)
@@ -156,17 +155,12 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
       else
       {
-        // lock_acquire (&file_lock);
         struct file_pointer *fn = get_file (args[1]);
         if (fn == NULL)
-          {
-            // lock_release (&file_lock);
-            break;
-          }
+          break;
         inode_add_user(file_get_inode (fn->file), false)  ;
         f->eax = file_read (fn->file, (void *) args[2], args[3]);
         inode_remove_user(file_get_inode (fn->file), false);
-        // lock_release (&file_lock);
       }
       break;
     }
@@ -183,40 +177,30 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
       else
       {
-        // lock_acquire (&file_lock);
         struct file_pointer *fn = get_file (args[1]);
         if (fn == NULL)
-          {
-            // lock_release (&file_lock);
-            break;
-          }
+          break;
         inode_add_user(file_get_inode (fn->file), false);
         f->eax = file_write (fn->file, (void *) args[2], args[3]);
         inode_remove_user(file_get_inode (fn->file), false);
-        // lock_release (&file_lock);
       }
       break;
     }
     case SYS_CREATE:
     {
-      // lock_acquire(&file_lock);
       inode_add_user(dir_get_inode(dir_open_root()), false);
       f->eax = filesys_create ((char *) args[1], args[2]);
       inode_remove_user(dir_get_inode(dir_open_root()), false);
-      // lock_release (&file_lock);
       break;
     }
     case SYS_REMOVE:
     {
-      // lock_acquire(&file_lock);
-      /* Locks in inode_remove() */
+      /* Locks in inode_close (), also need to do stuff in dir_remove() */
       f->eax = filesys_remove ((char *) args[1]);
-      // lock_release (&file_lock);
       break;
     }
     case SYS_OPEN:
     {
-      // lock_acquire(&file_lock);
       inode_add_user(dir_get_inode(dir_open_root()), false);
       struct file *temp_file = filesys_open ((char *) args[1]);
       if (temp_file)
@@ -233,37 +217,30 @@ syscall_handler (struct intr_frame *f UNUSED)
         f->eax = -1;
       }
       inode_remove_user(dir_get_inode(dir_open_root()), false);
-      // lock_release (&file_lock);
       break;
     }
     case SYS_FILESIZE:
     {
-      // lock_acquire(&file_lock);
       struct file_pointer *fn = get_file (args[1]);
       inode_add_user(file_get_inode(fn->file), true);
       f->eax = file_length (fn->file);
       inode_remove_user(file_get_inode(fn->file), true);
-      // lock_release (&file_lock);
       break;
     }
     case SYS_SEEK:
     {
-      // lock_acquire(&file_lock);
       struct file_pointer *fn = get_file (args[1]);
       inode_add_user(file_get_inode(fn->file), false);
       file_seek (fn->file, args[2]);
       inode_remove_user(file_get_inode(fn->file), false);
-      // lock_release (&file_lock);
       break;
     }
     case SYS_TELL:
     {
-      // lock_acquire(&file_lock);
       struct file_pointer *fn = get_file (args[1]);
       inode_add_user(file_get_inode(fn->file), false);
       f->eax = file_tell (fn->file);
       inode_remove_user(file_get_inode(fn->file), false);
-      // lock_release (&file_lock);
       break;
     }
     case SYS_CLOSE:
@@ -272,18 +249,13 @@ syscall_handler (struct intr_frame *f UNUSED)
         {
           break;
         }
-      // lock_acquire (&file_lock);
       struct file_pointer *fn = get_file (args[1]);
       if (fn == NULL)
-        {
-          // lock_release (&file_lock);
-          break;
-        }
+        break;
       // lock in inode_close ()
       file_close (fn->file);
       list_remove (&fn->elem);
       free (fn);
-      // lock_release (&file_lock);
       break;
     }
     case SYS_CHDIR:
