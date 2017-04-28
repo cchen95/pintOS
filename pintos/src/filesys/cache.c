@@ -132,7 +132,7 @@ update_lru (struct cache_block *cb)
 struct cache_block *
 get_data (block_sector_t sector)
 {
-  struct cache_block *cb = find_cache_block(sector);
+  struct cache_block *cb = find_cache_block (sector);
   if (cb)
       update_lru (cb);
   if (!cb)

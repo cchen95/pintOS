@@ -251,13 +251,14 @@ get_next_part (char part[NAME_MAX + 1], const char **srcp)
     return 0;
 
   /* Copy up to NAME_MAX character from SRC to DST. Add null terminator. */
-  while (*src != '/' && *src != '\0') {
-    if (dst < part + NAME_MAX)
-      *dst++ = *src;
-    else
-      return -1;
-    src++;
-  }
+  while (*src != '/' && *src != '\0')
+    {
+      if (dst < part + NAME_MAX)
+        *dst++ = *src;
+      else
+        return -1;
+      src++;
+    }
   *dst = '\0';
 
   /* Advance source pointer. */
@@ -275,12 +276,13 @@ dir_find(struct dir *dir, const char *filepath, char filename[])
   struct dir *curr_dir = dir;
 
   int n;
-  while ((n = get_next_part(filename, &filepath)) == 1) {
-    bool found_dir = dir_lookup(curr_dir, filename, &inode);
-    if (!found_dir) return NULL;
+  while ((n = get_next_part(filename, &filepath)) == 1)
+    {
+      bool found_dir = dir_lookup(curr_dir, filename, &inode);
+      if (!found_dir) return NULL;
 
-    curr_dir = dir_open(inode);
-  }
+      curr_dir = dir_open(inode);
+    }
 
   if (n == -1) return NULL;
 

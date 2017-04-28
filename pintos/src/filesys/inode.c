@@ -181,7 +181,10 @@ inode_close (struct inode *inode)
     return;
 
   /* Release resources if this was the last opener. */
-  if (--inode->open_cnt == 0)
+  // Maybe just lock inode instead?
+  inode_add_user(inode, true);
+  --inode->open_cnt;
+  if (inode->open_cnt == 0)
     {
       /* Remove from inode list and release lock. */
       list_remove (&inode->elem);
@@ -193,9 +196,11 @@ inode_close (struct inode *inode)
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length));
         }
-
+      inode_remove_user(inode, true);
       free (inode);
     }
+  else
+    inode_remove_user(inode, true)  ;
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -369,34 +374,28 @@ inode_length (const struct inode *inode)
 void
 inode_add_user (struct inode *inode, bool in_use)
 {
-  /* Whole file or directory operation */
+  /* Whole file operation, there should be 0 users to continue*/
   if (in_use)
-  {
-    lock_acquire (&inode->lock);
-    while (inode->user_cnt != 0)
     {
-      cond_wait (&inode->cv, &inode->lock);
+      lock_acquire (&inode->lock);
+      while (inode->user_cnt != 0)
+        cond_wait (&inode->cv, &inode->lock);
+      inode->user_cnt = -1;
+      lock_release (&inode->lock);
     }
-    inode->user_cnt = -1;
-    cond_signal (&inode->cv, &inode->lock);
-    lock_release (&inode->lock);
-  }
 
   /* Go through parents and increment number of sub users */
   struct inode *in = inode->parent;
   while (in != NULL)
-  {
-    lock_acquire (&in->lock);
-    while (in->user_cnt < 0)
     {
-      cond_wait (&in->cv, &in->lock);
+      lock_acquire (&in->lock);
+      /* Should not have whole file operation on parent to continue*/
+      while (in->user_cnt < 0)
+        cond_wait (&in->cv, &in->lock);
+      in->user_cnt++;
+      lock_release (&in->lock);
+      in = in->parent;
     }
-    in->user_cnt++;
-    cond_signal (&in->cv, &in->lock);
-    lock_release (&in->lock);
-
-    in = in->parent;
-  }
 }
 
 void
@@ -406,21 +405,21 @@ inode_remove_user (struct inode *inode, bool in_use)
      so just reset user_cnt to 0
   */
   if (in_use)
-  {
-    lock_acquire (&inode->lock);
-    inode->user_cnt = 0;
-    cond_signal (&inode->cv, &inode->lock);
-    lock_release (&inode->lock);
-  }
+    {
+      lock_acquire (&inode->lock);
+      inode->user_cnt = 0;
+      cond_signal (&inode->cv, &inode->lock);
+      lock_release (&inode->lock);
+    }
 
   struct inode *in = inode->parent;
   while (in != NULL)
-  {
-    lock_acquire (&in->lock);
-    in->user_cnt--;
-    cond_signal (&in->cv, &in->lock);
-    lock_release (&in->lock);
-    in = in->parent;
-  }
+    {
+      lock_acquire (&in->lock);
+      in->user_cnt--;
+      cond_signal (&in->cv, &in->lock);
+      lock_release (&in->lock);
+      in = in->parent;
+    }
 
 }
