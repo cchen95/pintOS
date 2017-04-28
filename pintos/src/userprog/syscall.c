@@ -209,7 +209,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_REMOVE:
     {
       // lock_acquire(&file_lock);
-      /* Lock acquired in directory.c:remove() */
+      /* Locks in inode_remove() */
       f->eax = filesys_remove ((char *) args[1]);
       // lock_release (&file_lock);
       break;
@@ -279,9 +279,8 @@ syscall_handler (struct intr_frame *f UNUSED)
           // lock_release (&file_lock);
           break;
         }
-      inode_add_user(file_get_inode(fn->file), false);
+      // lock in inode_close ()
       file_close (fn->file);
-      inode_remove_user(file_get_inode(fn->file), false);
       list_remove (&fn->elem);
       free (fn);
       // lock_release (&file_lock);

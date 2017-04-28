@@ -182,7 +182,7 @@ inode_close (struct inode *inode)
 
   /* Release resources if this was the last opener. */
   // Maybe just lock inode instead?
-  inode_add_user(inode, true);
+  inode_add_user(inode, false);
   --inode->open_cnt;
   if (inode->open_cnt == 0)
     {
@@ -196,11 +196,11 @@ inode_close (struct inode *inode)
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length));
         }
-      inode_remove_user(inode, true);
+      inode_remove_user(inode, false);
       free (inode);
     }
   else
-    inode_remove_user(inode, true)  ;
+    inode_remove_user(inode, false);
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
