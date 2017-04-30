@@ -183,25 +183,47 @@ syscall_handler (struct intr_frame *f UNUSED)
           f->eax = -1;
           break;
         }
-      inode_add_user(dir_get_inode (dir), false);
-      // inode_add_user(dir_get_inode (dir_open_root ()), false);
-      struct file *temp_file = filesys_open_dir (dir, filename);
-      // struct file *temp_file = filesys_open ((char *) args[1]);
-      if (temp_file)
+      struct inode *inode;
+      bool found = dir_lookup (dir, filename, &inode);
+      if (found)
         {
+          inode_add_user(inode, false);
+          struct file_pointer *fp = malloc (sizeof (struct file_pointer));
           struct thread *t = thread_current ();
-          struct file_pointer *f_temp = malloc (sizeof (struct file_pointer));
-          f_temp->file = temp_file;
-          f_temp->fd = t->next_fd++;
-          list_push_back (&t->file_list, &f_temp->elem);
-          f->eax = f_temp->fd;
+          if (inode_is_dir (inode))
+            {
+              struct dir *dir = dir_open (inode);
+              fp->dir = dir;
+              fp->is_dir = true;
+            }
+          else
+            {
+              struct file *file = file_open (inode);
+              fp->file = file;
+              fp->is_dir = false;
+            }
+          fp->fd = t->next_fd++;
+          list_push_back(&t->file_list, &fp->elem);
+          f->eax = fp->fd;
+          inode_remove_user (inode, false);
         }
-        else
+      else
         {
           f->eax = -1;
         }
-      // inode_remove_user(dir_get_inode (dir_open_root ()), false);
-      inode_remove_user (dir_get_inode (dir), false);
+      // if (temp_file)
+      //   {
+      //     struct thread *t = thread_current ();
+      //     struct file_pointer *f_temp = malloc (sizeof (struct file_pointer));
+      //     f_temp->file = temp_file;
+      //     f_temp->fd = t->next_fd++;
+      //     list_push_back (&t->file_list, &f_temp->elem);
+      //     f->eax = f_temp->fd;
+      //   }
+      //   else
+      //   {
+      //     f->eax = -1;
+      //   }
       dir_close (dir);
       break;
     }

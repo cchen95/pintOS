@@ -292,7 +292,7 @@ struct dir *
 dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
 {
   /* Need to close curr_dir after looking through */
-  struct dir *curr_dir, *old_dir;
+  struct dir *curr_dir, *old_dir = NULL;
   if (filepath == NULL)
     return NULL;
   else if (filepath[0] == '/')
@@ -328,8 +328,8 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
         }
 
       /* Close previous directory iterating through*/
-      old_dir = curr_dir;
       dir_close (old_dir);
+      old_dir = curr_dir;
 
       curr_dir = dir_open (inode);
     }
@@ -337,7 +337,8 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   if (n == -1)
     return NULL;
 
-  return curr_dir;
+  dir_close (curr_dir);
+  return old_dir;
 }
 
 bool
