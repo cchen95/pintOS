@@ -386,6 +386,12 @@ inode_is_dir (struct inode *inode)
 }
 
 void
+inode_set_dir (struct inode *inode, bool is_dir)
+{
+  inode->data.is_dir = true;
+}
+
+void
 inode_add_user (struct inode *inode, bool in_use)
 {
   /* Whole file operation, there should be 0 users to continue*/

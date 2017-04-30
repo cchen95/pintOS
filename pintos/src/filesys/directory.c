@@ -309,9 +309,11 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
 
       /* If not found and no more parts return. filename is the file/dir to be created*/
       if (!found_dir)
-        if (get_next_part (filename, &filepath) == 0)
-          return curr_dir;
-        return NULL;
+        {
+          if (get_next_part (filename, &filepath) == 0)
+            return curr_dir;
+          return NULL;
+        }
 
       /* If found entry, need to check if entry is file or directory
       If file, need to check that it is last component of filepath */
@@ -348,12 +350,15 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
                   && dir_add (dir, name, inode_sector));
 
   if (!success)
-    if (inode_sector != 0)
-      free_map_release (inode_sector, 1);
-    return false;
+    {
+      if (inode_sector != 0)
+        free_map_release (inode_sector, 1);
+      return false; 
+    }
 
-  /* Add parent ".." and self "." directories */
+  /* Add parent ".." and self "." directories, and set is_dir to true */
   struct dir *self_dir = dir_open (inode_open (inode_sector));
+  inode_set_dir (inode_open (inode_sector), true);
   success = (dir_add (dir, "..", inode_get_inumber (dir_get_inode (dir)))
               && dir_add(dir, ".", inode_sector));
 

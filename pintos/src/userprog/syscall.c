@@ -176,8 +176,17 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_OPEN:
     {
-      inode_add_user(dir_get_inode(dir_open_root()), false);
-      struct file *temp_file = filesys_open ((char *) args[1]);
+      char filename[NAME_MAX + 1];
+      struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+      if (dir == NULL)
+        {
+          f->eax = -1;
+          break;
+        }
+      inode_add_user(dir_get_inode (dir), false);
+      // inode_add_user(dir_get_inode (dir_open_root ()), false);
+      struct file *temp_file = filesys_open_dir (dir, filename);
+      // struct file *temp_file = filesys_open ((char *) args[1]);
       if (temp_file)
         {
           struct thread *t = thread_current ();
@@ -191,7 +200,9 @@ syscall_handler (struct intr_frame *f UNUSED)
         {
           f->eax = -1;
         }
-      inode_remove_user(dir_get_inode(dir_open_root()), false);
+      // inode_remove_user(dir_get_inode (dir_open_root ()), false);
+      inode_remove_user (dir_get_inode (dir), false);
+      dir_close (dir);
       break;
     }
     case SYS_FILESIZE:
@@ -238,7 +249,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         char filename[NAME_MAX + 1];
         struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
         struct inode *inode = NULL;
-        bool found_dir = dir_lookup(dir, filename, &inode);
+        bool found_dir = dir_lookup (dir, filename, &inode);
         dir_close (dir);
         if (!found_dir || !inode_is_dir(inode))
           {
