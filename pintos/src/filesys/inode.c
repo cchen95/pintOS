@@ -20,7 +20,11 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    int is_dir;
+    int has_parent;
+    block_sector_t parent;
+    int user_cnt;
+    uint32_t unused[121];               /* Not used. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -40,10 +44,6 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
-    bool is_dir;                        /* Directory or file */
-    struct inode *parent;               /* Containing directory */
-    bool in_use;                        /* Whole file/directory in use */
-    int user_cnt;                       /* Number of users, < 0: inode in use, > 0: sub use */
     struct lock lock;                   /* Lock */
     struct condition cv;                /* Condition variable */
   };
@@ -96,6 +96,8 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->user_cnt = 0;
+      disk_inode->has_parent = false;
       if (free_map_allocate (sectors, &disk_inode->start))
         {
           block_write (fs_device, sector, disk_inode);
@@ -148,8 +150,8 @@ inode_open (block_sector_t sector)
   inode->removed = false;
   cond_init(&inode->cv);
   lock_init(&inode->lock);
-  inode->user_cnt = 0;
-  inode->parent = NULL;
+  // inode->user_cnt = 0;
+  // inode->parent = NULL;
   block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
@@ -182,8 +184,9 @@ inode_close (struct inode *inode)
 
   /* Release resources if this was the last opener. */
   // Maybe just lock inode instead?
-  inode_add_user(inode, false);
-  --inode->open_cnt;
+  // inode_add_user(inode, false);
+  lock_acquire(&inode->lock);
+  inode->open_cnt--;
   if (inode->open_cnt == 0)
     {
       /* Remove from inode list and release lock. */
@@ -196,11 +199,13 @@ inode_close (struct inode *inode)
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length));
         }
-      inode_remove_user(inode, false);
+      // inode_remove_user(inode, false);
+      lock_release(&inode->lock);
       free (inode);
     }
   else
-    inode_remove_user(inode, false);
+    // inode_remove_user(inode, false);
+    lock_release(&inode->lock);
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -378,23 +383,29 @@ inode_add_user (struct inode *inode, bool in_use)
   if (in_use)
     {
       lock_acquire (&inode->lock);
-      while (inode->user_cnt != 0)
+      while (inode->data.user_cnt != 0)
         cond_wait (&inode->cv, &inode->lock);
-      inode->user_cnt = -1;
+      inode->data.user_cnt = -1;
       lock_release (&inode->lock);
     }
 
   /* Go through parents and increment number of sub users */
-  struct inode *in = inode->parent;
-  while (in != NULL)
+  bool has_parent = inode->data.has_parent;
+  block_sector_t parent_sector = inode->data.parent;
+
+  while (has_parent)
     {
+      struct inode *in = inode_open (parent_sector);
       lock_acquire (&in->lock);
       /* Should not have whole file operation on parent to continue*/
-      while (in->user_cnt < 0)
+      while (in->data.user_cnt < 0)
         cond_wait (&in->cv, &in->lock);
-      in->user_cnt++;
+      in->data.user_cnt++;
+      has_parent = in->data.has_parent;
+      parent_sector = in->data.parent;
       lock_release (&in->lock);
-      in = in->parent;
+      
+      inode_close(in);
     }
 }
 
@@ -407,19 +418,23 @@ inode_remove_user (struct inode *inode, bool in_use)
   if (in_use)
     {
       lock_acquire (&inode->lock);
-      inode->user_cnt = 0;
+      inode->data.user_cnt = 0;
       cond_signal (&inode->cv, &inode->lock);
       lock_release (&inode->lock);
     }
 
-  struct inode *in = inode->parent;
-  while (in != NULL)
+  bool has_parent = inode->data.has_parent;
+  block_sector_t parent_sector = inode->data.parent;
+  while (has_parent)
     {
+      struct inode *in = inode_open (parent_sector);
       lock_acquire (&in->lock);
-      in->user_cnt--;
+      in->data.user_cnt--;
+      has_parent = in->data.has_parent;
+      parent_sector = in->data.parent;
       cond_signal (&in->cv, &in->lock);
       lock_release (&in->lock);
-      in = in->parent;
+      inode_close(in);
     }
 
 }
