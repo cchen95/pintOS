@@ -308,6 +308,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  /* Set working directory */
+  if (t->wd == NULL)
+    t->wd = dir_open_root ();
+
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL)
