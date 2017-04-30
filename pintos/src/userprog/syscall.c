@@ -163,9 +163,12 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_CREATE:
     {
-      inode_add_user(dir_get_inode(dir_open_root()), false);
-      f->eax = filesys_create ((char *) args[1], args[2]);
-      inode_remove_user(dir_get_inode(dir_open_root()), false);
+      char filename[NAME_MAX + 1];
+      struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+      inode_add_user(dir_get_inode(dir), false);
+      f->eax = filesys_create_dir(dir, filename, args[2]);
+      inode_remove_user(dir_get_inode(dir), false);
+      dir_close (dir);
       break;
     }
     case SYS_REMOVE:
@@ -211,19 +214,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         {
           f->eax = -1;
         }
-      // if (temp_file)
-      //   {
-      //     struct thread *t = thread_current ();
-      //     struct file_pointer *f_temp = malloc (sizeof (struct file_pointer));
-      //     f_temp->file = temp_file;
-      //     f_temp->fd = t->next_fd++;
-      //     list_push_back (&t->file_list, &f_temp->elem);
-      //     f->eax = f_temp->fd;
-      //   }
-      //   else
-      //   {
-      //     f->eax = -1;
-      //   }
       dir_close (dir);
       break;
     }

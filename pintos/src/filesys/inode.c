@@ -388,7 +388,7 @@ inode_is_dir (struct inode *inode)
 void
 inode_set_dir (struct inode *inode, bool is_dir)
 {
-  inode->data.is_dir = true;
+  inode->data.is_dir = is_dir;
 }
 
 void

@@ -334,10 +334,9 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
       curr_dir = dir_open (inode);
     }
 
+  dir_close (curr_dir);
   if (n == -1)
     return NULL;
-
-  dir_close (curr_dir);
   return old_dir;
 }
 
