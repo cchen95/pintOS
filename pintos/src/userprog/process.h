@@ -7,7 +7,9 @@ struct file_pointer
   {
     int fd;
     const char *name;
+    bool is_dir;
     struct file *file;
+    struct dir *dir;
     struct list_elem elem;
   };
 

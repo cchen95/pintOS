@@ -208,7 +208,7 @@ thread_create (const char *name, int priority,
   cp->exit_status = -1;
   list_push_back (&running_thread ()->children, &cp->elem);
   t->proc = cp;
-  t->wd = running_thread ()->wd;
+  t->wd = running_thread ()-> wd;
 #endif
 
   /* Add to run queue. */

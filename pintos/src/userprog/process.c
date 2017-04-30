@@ -199,6 +199,9 @@ process_exit (void)
       free (f);
     }
 
+  if (cur->wd != NULL)
+    dir_close(cur->wd);
+
   printf ("%s: exit(%d)\n", (char *) &cur->name, cur->proc->exit_status);
   sema_up (&cur->proc->sema);
 }
@@ -311,6 +314,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set working directory */
   if (t->wd == NULL)
     t->wd = dir_open_root ();
+  else
+    t->wd = dir_reopen (t->wd);
 
   /* Open executable file. */
   file = filesys_open (file_name);

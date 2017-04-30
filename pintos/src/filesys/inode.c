@@ -65,12 +65,14 @@ byte_to_sector (const struct inode *inode, off_t pos)
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
+struct lock inode_list_lock;
 
 /* Initializes the inode module. */
 void
 inode_init (void)
 {
   list_init (&open_inodes);
+  lock_init (&inode_list_lock);
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -126,6 +128,8 @@ inode_open (block_sector_t sector)
   struct inode *inode;
 
   /* Check whether this inode is already open. */
+  // Might need a lock on the list of open inodes?
+  lock_acquire (&inode_list_lock);
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e))
     {
@@ -133,9 +137,12 @@ inode_open (block_sector_t sector)
       if (inode->sector == sector)
         {
           inode_reopen (inode);
+          lock_release (&inode_list_lock);
           return inode;
         }
     }
+
+  lock_release (&inode_list_lock);
 
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
@@ -143,15 +150,15 @@ inode_open (block_sector_t sector)
     return NULL;
 
   /* Initialize. */
+  lock_acquire (&inode_list_lock);
   list_push_front (&open_inodes, &inode->elem);
+  lock_release (&inode_list_lock);
   inode->sector = sector;
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
   cond_init(&inode->cv);
   lock_init(&inode->lock);
-  // inode->user_cnt = 0;
-  // inode->parent = NULL;
   block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
@@ -183,11 +190,8 @@ inode_close (struct inode *inode)
     return;
 
   /* Release resources if this was the last opener. */
-  // Maybe just lock inode instead?
-  // inode_add_user(inode, false);
-  lock_acquire(&inode->lock);
-  inode->open_cnt--;
-  if (inode->open_cnt == 0)
+  lock_acquire (&inode->lock);
+  if (--inode->open_cnt == 0)
     {
       /* Remove from inode list and release lock. */
       list_remove (&inode->elem);
@@ -200,11 +204,10 @@ inode_close (struct inode *inode)
                             bytes_to_sectors (inode->data.length));
         }
       // inode_remove_user(inode, false);
-      lock_release(&inode->lock);
+      lock_release (&inode->lock);
       free (inode);
     }
   else
-    // inode_remove_user(inode, false);
     lock_release(&inode->lock);
 }
 
@@ -374,6 +377,12 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+bool
+inode_is_dir (struct inode *inode)
+{
+  return inode->data.is_dir;
 }
 
 void

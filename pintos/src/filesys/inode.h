@@ -20,6 +20,7 @@ void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 
+bool inode_is_dir (struct inode *);
 void inode_add_user (struct inode *, bool in_use);
 void inode_remove_user (struct inode *, bool in_use);
 

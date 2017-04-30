@@ -4,6 +4,7 @@
 #include <list.h>
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "filesys/free-map.h"
 #include "threads/malloc.h"
 
 /* A directory. */
@@ -235,6 +236,27 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   return false;
 }
 
+bool
+dir_is_empty (struct dir *dir)
+{
+  struct dir_entry e;
+  off_t pos = 0;
+
+  while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
+    {
+      if (e.in_use)
+        return false;
+      pos += sizeof e;
+    }
+  return false;
+}
+
+size_t
+num_dir_entries (void)
+{
+  return BLOCK_SECTOR_SIZE / sizeof (struct dir_entry);
+}
+
 /* Extracts a file name part from *SRCP into PART, and updates *SRCP so that the
 next call will return the next file name part. Returns 1 if successful, 0 at
 end of string, -1 for a too-long file name part. */
@@ -267,24 +289,74 @@ get_next_part (char part[NAME_MAX + 1], const char **srcp)
 }
 
 struct dir *
-dir_find(struct dir *dir, const char *filepath, char filename[])
+dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
 {
-  if (filepath == NULL) return NULL;
+  /* Need to close curr_dir after looking through */
+  struct dir *curr_dir, *old_dir;
+  if (filepath == NULL)
+    return NULL;
+  else if (filepath[0] == '/')
+    curr_dir = dir_open_root();
+  else
+    curr_dir = dir_reopen(dir);
 
-  // char name[NAME_MAX + 1];
   struct inode *inode = NULL;
-  struct dir *curr_dir = dir;
 
   int n;
   while ((n = get_next_part(filename, &filepath)) == 1)
     {
       bool found_dir = dir_lookup(curr_dir, filename, &inode);
-      if (!found_dir) return NULL;
 
-      curr_dir = dir_open(inode);
+      /* If not found and no more parts return. filename is the file/dir to be created*/
+      if (!found_dir)
+        if (get_next_part (filename, &filepath) == 0)
+          return curr_dir;
+        return NULL;
+
+      /* If found entry, need to check if entry is file or directory
+      If file, need to check that it is last component of filepath */
+      if (!inode_is_dir (inode))
+        {
+          if (get_next_part (filename, &filepath) != 0)
+            {
+              dir_close(curr_dir);
+              return NULL;
+            }
+          return curr_dir;
+        }
+
+      /* Close previous directory iterating through*/
+      old_dir = curr_dir;
+      dir_close (old_dir);
+
+      curr_dir = dir_open (inode);
     }
 
-  if (n == -1) return NULL;
+  if (n == -1)
+    return NULL;
 
   return curr_dir;
+}
+
+bool
+dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
+{
+  block_sector_t inode_sector = 0;
+  bool success = (dir != NULL
+                  && free_map_allocate (1, &inode_sector)
+                  && dir_create (inode_sector, num_dir_entries ())
+                  && dir_add (dir, name, inode_sector));
+
+  if (!success)
+    if (inode_sector != 0)
+      free_map_release (inode_sector, 1);
+    return false;
+
+  /* Add parent ".." and self "." directories */
+  struct dir *self_dir = dir_open (inode_open (inode_sector));
+  success = (dir_add (dir, "..", inode_get_inumber (dir_get_inode (dir)))
+              && dir_add(dir, ".", inode_sector));
+
+  dir_close (self_dir);
+  return success;
 }
