@@ -102,137 +102,147 @@ syscall_handler (struct intr_frame *f UNUSED)
       shutdown_power_off ();
       break;
     case SYS_EXIT:
-    {
-      thread_current ()->proc->exit_status = args[1];
-      thread_exit ();
-      break;
-    }
+      {
+        thread_current ()->proc->exit_status = args[1];
+        thread_exit ();
+        break;
+      }
     case SYS_EXEC:
-      f->eax = process_execute ((char *) args[1]);
-      break;
+      {
+        f->eax = process_execute ((char *) args[1]);
+        break;
+      }
     case SYS_READ:
-    {
-      if (args[1] == STDIN_FILENO)
       {
-        uint8_t *buffer = (uint8_t *) args[2];
-        size_t i = 0;
-        while (i < args[3])
+        if (args[1] == STDIN_FILENO)
           {
-            buffer[i] = input_getc ();
-            if (buffer[i++] == '\n')
-              break;
+            uint8_t *buffer = (uint8_t *) args[2];
+            size_t i = 0;
+            while (i < args[3])
+              {
+                buffer[i] = input_getc ();
+                if (buffer[i++] == '\n')
+                  break;
+              }
+            f->eax = i;
           }
-        f->eax = i;
+        else if (args[1] == STDOUT_FILENO)
+          f->eax = 0;
+        else
+          {
+            struct file_pointer *fn = get_file (args[1]);
+            if (fn == NULL)
+              {
+                f->eax = -1;
+                break;
+              }
+            inode_add_user(file_get_inode (fn->file), false)  ;
+            f->eax = file_read (fn->file, (void *) args[2], args[3]);
+            inode_remove_user(file_get_inode (fn->file), false);
+          }
+        break;
       }
-      else if (args[1] == STDOUT_FILENO)
-      {
-        f->eax = 0;
-      }
-      else
-      {
-        struct file_pointer *fn = get_file (args[1]);
-        if (fn == NULL)
-          break;
-        inode_add_user(file_get_inode (fn->file), false)  ;
-        f->eax = file_read (fn->file, (void *) args[2], args[3]);
-        inode_remove_user(file_get_inode (fn->file), false);
-      }
-      break;
-    }
     case SYS_WRITE:
-    {
-      if (args[1] == STDOUT_FILENO)
       {
-        putbuf ((void *) args[2], args[3]);
-        f->eax = args[3];
+        if (args[1] == STDOUT_FILENO)
+          {
+            putbuf ((void *) args[2], args[3]);
+            f->eax = args[3];
+          }
+        else if (args[1] == STDIN_FILENO)
+            f->eax = 0;
+        else
+          {
+            struct file_pointer *fn = get_file (args[1]);
+            if (fn == NULL || fn->is_dir)
+            {
+              f->eax = -1;
+              break;
+            }
+            inode_add_user(file_get_inode (fn->file), false);
+            f->eax = file_write (fn->file, (void *) args[2], args[3]);
+            inode_remove_user(file_get_inode (fn->file), false);
+          }
+        break;
       }
-      else if (args[1] == STDIN_FILENO)
+    case SYS_CREATE:
       {
-        f->eax = 0;
+        char filename[NAME_MAX + 1];
+        struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+        if (dir == NULL)
+          {
+            f->eax = false;
+            break;
+          }
+        inode_add_user(dir_get_inode(dir), false);
+        f->eax = filesys_create_dir(dir, filename, args[2]);
+        inode_remove_user(dir_get_inode(dir), false);
+
+        dir_close (dir);
+        break;
       }
-      else
+    case SYS_REMOVE:
+      {
+        /* Locks in inode_close (), also need to do stuff in dir_remove() */
+        f->eax = filesys_remove ((char *) args[1]);
+        break;
+      }
+    case SYS_OPEN:
+      {
+        char filename[NAME_MAX + 1];
+        struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+        if (dir == NULL)
+          {
+            f->eax = -1;
+            break;
+          }
+        struct inode *inode;
+        bool found = dir_lookup (dir, filename, &inode);
+        if (found)
+          {
+            inode_add_user(inode, false);
+            struct file_pointer *fp = malloc (sizeof (struct file_pointer));
+            struct thread *t = thread_current ();
+            if (inode_is_dir (inode))
+              {
+                struct dir *dir = dir_open (inode);
+                fp->dir = dir;
+                fp->is_dir = true;
+              }
+            else
+              {
+                struct file *file = file_open (inode);
+                fp->file = file;
+                fp->is_dir = false;
+              }
+            fp->fd = t->next_fd++;
+            list_push_back(&t->file_list, &fp->elem);
+            f->eax = fp->fd;
+            inode_remove_user (inode, false);
+          }
+        else
+          {
+            f->eax = -1;
+          }
+        dir_close (dir);
+        break;
+      }
+    case SYS_FILESIZE:
       {
         struct file_pointer *fn = get_file (args[1]);
-        if (fn == NULL)
-          break;
-        inode_add_user(file_get_inode (fn->file), false);
-        f->eax = file_write (fn->file, (void *) args[2], args[3]);
-        inode_remove_user(file_get_inode (fn->file), false);
+        inode_add_user(file_get_inode(fn->file), true);
+        f->eax = file_length (fn->file);
+        inode_remove_user(file_get_inode(fn->file), true);
+        break;
       }
-      break;
-    }
-    case SYS_CREATE:
-    {
-      char filename[NAME_MAX + 1];
-      struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
-      inode_add_user(dir_get_inode(dir), false);
-      f->eax = filesys_create_dir(dir, filename, args[2]);
-      inode_remove_user(dir_get_inode(dir), false);
-      dir_close (dir);
-      break;
-    }
-    case SYS_REMOVE:
-    {
-      /* Locks in inode_close (), also need to do stuff in dir_remove() */
-      f->eax = filesys_remove ((char *) args[1]);
-      break;
-    }
-    case SYS_OPEN:
-    {
-      char filename[NAME_MAX + 1];
-      struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
-      if (dir == NULL)
-        {
-          f->eax = -1;
-          break;
-        }
-      struct inode *inode;
-      bool found = dir_lookup (dir, filename, &inode);
-      if (found)
-        {
-          inode_add_user(inode, false);
-          struct file_pointer *fp = malloc (sizeof (struct file_pointer));
-          struct thread *t = thread_current ();
-          if (inode_is_dir (inode))
-            {
-              struct dir *dir = dir_open (inode);
-              fp->dir = dir;
-              fp->is_dir = true;
-            }
-          else
-            {
-              struct file *file = file_open (inode);
-              fp->file = file;
-              fp->is_dir = false;
-            }
-          fp->fd = t->next_fd++;
-          list_push_back(&t->file_list, &fp->elem);
-          f->eax = fp->fd;
-          inode_remove_user (inode, false);
-        }
-      else
-        {
-          f->eax = -1;
-        }
-      dir_close (dir);
-      break;
-    }
-    case SYS_FILESIZE:
-    {
-      struct file_pointer *fn = get_file (args[1]);
-      inode_add_user(file_get_inode(fn->file), true);
-      f->eax = file_length (fn->file);
-      inode_remove_user(file_get_inode(fn->file), true);
-      break;
-    }
     case SYS_SEEK:
-    {
-      struct file_pointer *fn = get_file (args[1]);
-      inode_add_user(file_get_inode(fn->file), false);
-      file_seek (fn->file, args[2]);
-      inode_remove_user(file_get_inode(fn->file), false);
-      break;
-    }
+      {
+        struct file_pointer *fn = get_file (args[1]);
+        inode_add_user(file_get_inode(fn->file), false);
+        file_seek (fn->file, args[2]);
+        inode_remove_user(file_get_inode(fn->file), false);
+        break;
+      }
     case SYS_TELL:
     {
       struct file_pointer *fn = get_file (args[1]);

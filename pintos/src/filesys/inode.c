@@ -100,6 +100,7 @@ inode_create (block_sector_t sector, off_t length)
       disk_inode->magic = INODE_MAGIC;
       disk_inode->user_cnt = 0;
       disk_inode->has_parent = false;
+      disk_inode->is_dir = false;
       if (free_map_allocate (sectors, &disk_inode->start))
         {
           block_write (fs_device, sector, disk_inode);
@@ -392,6 +393,13 @@ inode_set_dir (struct inode *inode, bool is_dir)
 }
 
 void
+inode_set_parent (struct inode *inode, block_sector_t parent_sector)
+{
+  inode->data.has_parent = true;
+  inode->data.parent = parent_sector;
+}
+
+void
 inode_add_user (struct inode *inode, bool in_use)
 {
   /* Whole file operation, there should be 0 users to continue*/
@@ -451,5 +459,4 @@ inode_remove_user (struct inode *inode, bool in_use)
       lock_release (&in->lock);
       inode_close(in);
     }
-
 }
