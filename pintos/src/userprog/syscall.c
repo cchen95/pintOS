@@ -131,8 +131,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       else
       {
         struct file_pointer *fn = get_file (args[1]);
-        if (fn == NULL)
-          break;
+        if (fn == NULL || fn->is_dir)
+          {
+            f->eax = -1;
+            break;
+          }
         inode_add_user(file_get_inode (fn->file), false)  ;
         f->eax = file_read (fn->file, (void *) args[2], args[3]);
         inode_remove_user(file_get_inode (fn->file), false);
@@ -153,8 +156,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       else
       {
         struct file_pointer *fn = get_file (args[1]);
-        if (fn == NULL)
-          break;
+        if (fn == NULL || fn->is_dir)
+          {
+            f->eax = -1;
+            break;
+          }
         inode_add_user(file_get_inode (fn->file), false);
         f->eax = file_write (fn->file, (void *) args[2], args[3]);
         inode_remove_user(file_get_inode (fn->file), false);
@@ -163,69 +169,72 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_CREATE:
     {
-      inode_add_user(dir_get_inode(dir_open_root()), false);
-      f->eax = filesys_create ((char *) args[1], args[2]);
-      inode_remove_user(dir_get_inode(dir_open_root()), false);
+      char filename[NAME_MAX + 1];
+      struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+      inode_add_user (dir_get_inode (dir_open_root ()), false);
+      f->eax = filesys_create_dir (dir, filename, args[2]);
+      inode_remove_user (dir_get_inode (dir_open_root ()), false);
       break;
     }
     case SYS_REMOVE:
     {
       /* Locks in inode_close (), also need to do stuff in dir_remove() */
-      f->eax = filesys_remove ((char *) args[1]);
+      char filename[NAME_MAX + 1];
+      struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+      if (dir == NULL)
+        f->eax = filesys_remove ((char *) args[1]);
+      else
+        {
+          // Need to fix dir_is_empty
+          // struct inode *inode;
+          // bool found_dir = dir_lookup (dir, filename, &inode);
+          // if (!found_dir || !inode_is_dir (inode) || !dir_is_empty (dir))
+          //   f->eax = false;
+          // if (!dir_is_empty (dir))
+          // else
+            f->eax = dir_remove (dir, (char *) args[1]);
+        }
       break;
     }
     case SYS_OPEN:
     {
-      char filename[NAME_MAX + 1];
-      struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
-      if (dir == NULL)
-        {
-          f->eax = -1;
-          break;
-        }
-      struct inode *inode;
-      bool found = dir_lookup (dir, filename, &inode);
-      if (found)
-        {
-          inode_add_user(inode, false);
-          struct file_pointer *fp = malloc (sizeof (struct file_pointer));
-          struct thread *t = thread_current ();
-          if (inode_is_dir (inode))
-            {
-              struct dir *dir = dir_open (inode);
-              fp->dir = dir;
-              fp->is_dir = true;
-            }
-          else
-            {
-              struct file *file = file_open (inode);
-              fp->file = file;
-              fp->is_dir = false;
-            }
-          fp->fd = t->next_fd++;
-          list_push_back(&t->file_list, &fp->elem);
-          f->eax = fp->fd;
-          inode_remove_user (inode, false);
-        }
-      else
-        {
-          f->eax = -1;
-        }
-      // if (temp_file)
-      //   {
-      //     struct thread *t = thread_current ();
-      //     struct file_pointer *f_temp = malloc (sizeof (struct file_pointer));
-      //     f_temp->file = temp_file;
-      //     f_temp->fd = t->next_fd++;
-      //     list_push_back (&t->file_list, &f_temp->elem);
-      //     f->eax = f_temp->fd;
-      //   }
-      //   else
-      //   {
-      //     f->eax = -1;
-      //   }
-      dir_close (dir);
-      break;
+     char filename[NAME_MAX + 1];
+     struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+     if (dir == NULL)
+       {
+         f->eax = -1;
+         break;
+       }
+     struct inode *inode;
+     bool found = dir_lookup (dir, filename, &inode);
+     if (found)
+       {
+         inode_add_user(inode, false);
+         struct file_pointer *fp = malloc (sizeof (struct file_pointer));
+         struct thread *t = thread_current ();
+         if (inode_is_dir (inode))
+           {
+             struct dir *dir = dir_open (inode);
+             fp->dir = dir;
+             fp->is_dir = true;
+           }
+         else
+           {
+             struct file *file = file_open (inode);
+             fp->file = file;
+             fp->is_dir = false;
+           }
+         fp->fd = t->next_fd++;
+         list_push_back(&t->file_list, &fp->elem);
+         f->eax = fp->fd;
+         inode_remove_user (inode, false);
+       }
+     else
+       {
+         f->eax = -1;
+       }
+     dir_close (dir);
+     break;
     }
     case SYS_FILESIZE:
     {
@@ -271,7 +280,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         char filename[NAME_MAX + 1];
         struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
         struct inode *inode = NULL;
-        bool found_dir = dir_lookup (dir, filename, &inode);
+        bool found_dir = dir_lookup(dir, filename, &inode);
         dir_close (dir);
         if (!found_dir || !inode_is_dir(inode))
           {
@@ -293,6 +302,23 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
     case SYS_READDIR:
       {
+        char filename[NAME_MAX + 1];
+        struct file_pointer *fp = get_file (args[1]);
+        struct dir *dir = dir_find (thread_current ()->wd, fp->name, filename);
+        if (dir == NULL)
+          {
+            f->eax = false;
+            break;
+          }
+        struct inode *inode;
+        bool found_dir = dir_lookup (dir, filename, &inode);
+        dir_close (dir);
+        if (!found_dir || !inode_is_dir (inode))
+          {
+            f->eax = false;
+            break;
+          }
+        f->eax =  dir_readdir (fp->dir, (char *) args[2]);
         break;
       }
     case SYS_ISDIR:

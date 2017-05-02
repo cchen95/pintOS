@@ -49,7 +49,7 @@ process_execute (const char *file_name)
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  
+
   free (name);
 
   struct childProc *cp = get_child_process (tid);
@@ -185,7 +185,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  
+
   while (!list_empty (&cur->children))
     {
       struct list_elem *e = list_pop_front (&cur->children);
@@ -195,7 +195,10 @@ process_exit (void)
     {
       struct list_elem *e = list_pop_front (&cur->file_list);
       struct file_pointer *f = list_entry (e, struct file_pointer, elem);
-      file_close (f->file);
+      if (f->is_dir)
+        dir_close (f->dir);
+      else
+        file_close (f->file);
       free (f);
     }
 

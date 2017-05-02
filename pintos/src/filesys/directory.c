@@ -265,7 +265,7 @@ get_next_part (char part[NAME_MAX + 1], const char **srcp)
 {
   const char *src = *srcp;
   char *dst = part;
-  
+
   /* Skip leading slashes. If it’s all slashes, we’re done. */
   while (*src == '/')
     src++;
@@ -334,10 +334,9 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
       curr_dir = dir_open (inode);
     }
 
+  dir_close (curr_dir);
   if (n == -1)
     return NULL;
-
-  dir_close (curr_dir);
   return old_dir;
 }
 
@@ -354,7 +353,7 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
     {
       if (inode_sector != 0)
         free_map_release (inode_sector, 1);
-      return false; 
+      return false;
     }
 
   /* Add parent ".." and self "." directories, and set is_dir to true */
