@@ -173,7 +173,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
       inode_add_user (dir_get_inode (dir_open_root ()), false);
       f->eax = filesys_create_dir (dir, filename, args[2]);
-      inode_remove_user (dir_get_inode (dir_open_root ()), false);
+      inode_remove_user(dir_get_inode(dir), false);
+      dir_close (dir);
       break;
     }
     case SYS_REMOVE:
