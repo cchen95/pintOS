@@ -288,9 +288,17 @@ get_next_part (char part[NAME_MAX + 1], const char **srcp)
   return 1;
 }
 
+/* Helper method for locating dir/file with a directory. Will create a struct dir
+or NULL, to be closed by the caller after use*/
 struct dir *
 dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
 {
+  /* Empty string */
+  if (strcmp (filepath, "") == 0)
+    return NULL;
+
+  memset(filename, 0, NAME_MAX + 1);
+
   /* Need to close curr_dir after looking through */
   struct dir *curr_dir, *old_dir = NULL;
   if (filepath == NULL)
@@ -300,14 +308,17 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   else
     curr_dir = dir_reopen(dir);
 
+  /* If case string is full of empty slashes*/
+  old_dir = dir_reopen (curr_dir);
   struct inode *inode = NULL;
 
   int n;
   while ((n = get_next_part(filename, &filepath)) == 1)
     {
+      dir_close (old_dir);
       bool found_dir = dir_lookup(curr_dir, filename, &inode);
 
-      /* If not found and no more parts return. filename is the file/dir to be created*/
+      /* If not found and no more parts return. filename is the file/dir to be created */
       if (!found_dir)
         {
           if (get_next_part (filename, &filepath) == 0)
@@ -327,16 +338,17 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
           return curr_dir;
         }
 
-      /* Close previous directory iterating through*/
-      dir_close (old_dir);
+      /* Close previous directory iterating through, open new one to look through*/
       old_dir = curr_dir;
-
       curr_dir = dir_open (inode);
     }
 
   dir_close (curr_dir);
-  if (n == -1)
-    return NULL;
+  if (n == -1) 
+    {
+      dir_close (old_dir);
+      return NULL;
+    }
   return old_dir;
 }
 
@@ -359,9 +371,6 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
   /* Add parent ".." and self "." directories, and set is_dir to true */
   struct inode *self_inode = inode_open (inode_sector);
   struct dir *self_dir = dir_open (self_inode);
-
-  // inode_set_dir (inode_open (inode_sector), true);
-  /*Not sure why this one doesn't work, inode_disk doesn't seem to persist */
   inode_set_dir (self_inode, true);
 
   block_sector_t parent_sector = inode_get_inumber (dir_get_inode (dir));

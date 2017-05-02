@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -196,8 +197,17 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = -1;
             break;
           }
+
         struct inode *inode;
         bool found = dir_lookup (dir, filename, &inode);
+
+        /* Ugly handling for "/" */
+        if (strcmp(filename, "") == 0)
+        {
+          inode = inode_reopen (dir_get_inode (dir));
+          found = true;
+        }
+        
         dir_close (dir);
         if (found)
           {
