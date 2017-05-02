@@ -207,7 +207,7 @@ syscall_handler (struct intr_frame *f UNUSED)
           inode = inode_reopen (dir_get_inode (dir));
           found = true;
         }
-        
+
         dir_close (dir);
         if (found)
           {
@@ -282,8 +282,16 @@ syscall_handler (struct intr_frame *f UNUSED)
         struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
         struct inode *inode = NULL;
         bool found_dir = dir_lookup (dir, filename, &inode);
+
+        /* Handling for "/" */
+        if (strcmp (filename, "") == 0)
+        {
+          inode = inode_reopen (dir_get_inode (dir));
+          found_dir = true;
+        }
+
         dir_close (dir);
-        if (!found_dir || !inode_is_dir(inode))
+        if (!found_dir || !inode_is_dir (inode))
           {
             f->eax = false;
             break;

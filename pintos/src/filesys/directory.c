@@ -245,7 +245,11 @@ dir_is_empty (struct dir *dir)
   while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
     {
       if (e.in_use)
-        return false;
+        {
+          if ((strcmp (e.name, "..") != 0) 
+              || (strcmp (e.name, ".") != 0))
+            return false;
+        }
       pos += sizeof e;
     }
   return false;
