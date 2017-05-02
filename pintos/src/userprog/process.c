@@ -202,8 +202,7 @@ process_exit (void)
       free (f);
     }
 
-  if (cur->wd != NULL)
-    dir_close(cur->wd);
+  dir_close(cur->wd);
 
   printf ("%s: exit(%d)\n", (char *) &cur->name, cur->proc->exit_status);
   sema_up (&cur->proc->sema);
@@ -321,7 +320,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     t->wd = dir_reopen (t->wd);
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  char name[NAME_MAX + 1];
+  struct dir *dir = dir_find (t->wd, file_name, name);
+  file = filesys_open_dir (dir, name);
+  dir_close (dir);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);

@@ -202,6 +202,9 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  if (inode_get_open_cnt (inode) > 0)
+    goto done;
+
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
@@ -240,15 +243,19 @@ bool
 dir_is_empty (struct dir *dir)
 {
   struct dir_entry e;
-  off_t pos = 0;
+  off_t pos = 60;
 
   while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
     {
       if (e.in_use)
-        return false;
+        {
+          if ((strcmp (e.name, "..") != 0)
+              && (strcmp (e.name, ".") != 0))
+            return false;
+        }
       pos += sizeof e;
     }
-  return false;
+  return true;
 }
 
 size_t
@@ -288,26 +295,43 @@ get_next_part (char part[NAME_MAX + 1], const char **srcp)
   return 1;
 }
 
+/* Helper method for locating dir/file with a directory. Will create a struct dir
+or NULL, to be closed by the caller after use*/
 struct dir *
 dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
 {
+  /* Empty string */
+  if (strcmp (filepath, "") == 0)
+    return NULL;
+
+  memset(filename, 0, NAME_MAX + 1);
+
   /* Need to close curr_dir after looking through */
   struct dir *curr_dir, *old_dir = NULL;
   if (filepath == NULL)
     return NULL;
+  else if (strcmp (filepath, "/") == 0)
+    {
+      curr_dir = dir_open_root();
+      inode_set_dir (curr_dir->inode, true);
+      return curr_dir;
+    }
   else if (filepath[0] == '/')
     curr_dir = dir_open_root();
   else
     curr_dir = dir_reopen(dir);
 
+  /* If case string is full of empty slashes*/
+  old_dir = dir_reopen (curr_dir);
   struct inode *inode = NULL;
 
   int n;
   while ((n = get_next_part(filename, &filepath)) == 1)
     {
+      dir_close (old_dir);
       bool found_dir = dir_lookup(curr_dir, filename, &inode);
 
-      /* If not found and no more parts return. filename is the file/dir to be created*/
+      /* If not found and no more parts return. filename is the file/dir to be created */
       if (!found_dir)
         {
           if (get_next_part (filename, &filepath) == 0)
@@ -327,16 +351,17 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
           return curr_dir;
         }
 
-      /* Close previous directory iterating through*/
-      dir_close (old_dir);
+      /* Close previous directory iterating through, open new one to look through*/
       old_dir = curr_dir;
-
       curr_dir = dir_open (inode);
     }
 
   dir_close (curr_dir);
   if (n == -1)
-    return NULL;
+    {
+      dir_close (old_dir);
+      return NULL;
+    }
   return old_dir;
 }
 
@@ -357,10 +382,14 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
     }
 
   /* Add parent ".." and self "." directories, and set is_dir to true */
-  struct dir *self_dir = dir_open (inode_open (inode_sector));
-  inode_set_dir (inode_open (inode_sector), true);
-  success = (dir_add (dir, "..", inode_get_inumber (dir_get_inode (dir)))
-              && dir_add(dir, ".", inode_sector));
+  struct inode *self_inode = inode_open (inode_sector);
+  struct dir *self_dir = dir_open (self_inode);
+  inode_set_dir (self_inode, true);
+
+  block_sector_t parent_sector = inode_get_inumber (dir_get_inode (dir));
+  inode_set_parent(self_inode, parent_sector);
+  success = (dir_add (self_dir, "..", parent_sector)
+              && dir_add(self_dir, ".", inode_sector));
 
   dir_close (self_dir);
   return success;
