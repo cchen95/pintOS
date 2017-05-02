@@ -174,9 +174,9 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = false;
             break;
           }
-        inode_add_user(dir_get_inode(dir), false);
-        f->eax = filesys_create_dir(dir, filename, args[2]);
-        inode_remove_user(dir_get_inode(dir), false);
+        inode_add_user (dir_get_inode (dir), false);
+        f->eax = filesys_create_dir (dir, filename, args[2]);
+        inode_remove_user (dir_get_inode(dir), false);
 
         dir_close (dir);
         break;
@@ -198,6 +198,7 @@ syscall_handler (struct intr_frame *f UNUSED)
           }
         struct inode *inode;
         bool found = dir_lookup (dir, filename, &inode);
+        dir_close (dir);
         if (found)
           {
             inode_add_user(inode, false);
@@ -224,7 +225,6 @@ syscall_handler (struct intr_frame *f UNUSED)
           {
             f->eax = -1;
           }
-        dir_close (dir);
         break;
       }
     case SYS_FILESIZE:

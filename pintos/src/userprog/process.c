@@ -195,12 +195,14 @@ process_exit (void)
     {
       struct list_elem *e = list_pop_front (&cur->file_list);
       struct file_pointer *f = list_entry (e, struct file_pointer, elem);
-      file_close (f->file);
+      if (f->is_dir)
+        dir_close (f->dir);
+      else
+        file_close (f->file);
       free (f);
     }
 
-  if (cur->wd != NULL)
-    dir_close(cur->wd);
+  dir_close(cur->wd);
 
   printf ("%s: exit(%d)\n", (char *) &cur->name, cur->proc->exit_status);
   sema_up (&cur->proc->sema);

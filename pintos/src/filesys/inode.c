@@ -46,6 +46,7 @@ struct inode
     struct inode_disk data;             /* Inode content. */
     struct lock lock;                   /* Lock */
     struct condition cv;                /* Condition variable */
+    bool dirty;
   };
 
 /* Returns the block device sector that contains byte offset POS
@@ -128,6 +129,8 @@ inode_open (block_sector_t sector)
   struct list_elem *e;
   struct inode *inode;
 
+  /* Need to check cache first? */
+
   /* Check whether this inode is already open. */
   // Might need a lock on the list of open inodes?
   lock_acquire (&inode_list_lock);
@@ -158,8 +161,11 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  inode->dirty = false;
   cond_init(&inode->cv);
   lock_init(&inode->lock);
+
+  /* Move to cache */
   block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
@@ -196,6 +202,10 @@ inode_close (struct inode *inode)
     {
       /* Remove from inode list and release lock. */
       list_remove (&inode->elem);
+
+      /* If dirty, write block metadata to disk*/
+      if (inode->dirty)
+        block_write (fs_device, inode->sector, &inode->data);
 
       /* Deallocate blocks if removed. */
       if (inode->removed)
@@ -389,12 +399,14 @@ inode_is_dir (struct inode *inode)
 void
 inode_set_dir (struct inode *inode, bool is_dir)
 {
+  inode->dirty = true;
   inode->data.is_dir = is_dir;
 }
 
 void
 inode_set_parent (struct inode *inode, block_sector_t parent_sector)
 {
+  inode->dirty = true;
   inode->data.has_parent = true;
   inode->data.parent = parent_sector;
 }
@@ -408,6 +420,7 @@ inode_add_user (struct inode *inode, bool in_use)
       lock_acquire (&inode->lock);
       while (inode->data.user_cnt != 0)
         cond_wait (&inode->cv, &inode->lock);
+      inode->dirty = true;
       inode->data.user_cnt = -1;
       lock_release (&inode->lock);
     }
@@ -423,11 +436,11 @@ inode_add_user (struct inode *inode, bool in_use)
       /* Should not have whole file operation on parent to continue*/
       while (in->data.user_cnt < 0)
         cond_wait (&in->cv, &in->lock);
+      inode->dirty = true;
       in->data.user_cnt++;
       has_parent = in->data.has_parent;
       parent_sector = in->data.parent;
       lock_release (&in->lock);
-      
       inode_close(in);
     }
 }
@@ -441,6 +454,7 @@ inode_remove_user (struct inode *inode, bool in_use)
   if (in_use)
     {
       lock_acquire (&inode->lock);
+      inode->dirty = true;
       inode->data.user_cnt = 0;
       cond_signal (&inode->cv, &inode->lock);
       lock_release (&inode->lock);
@@ -452,6 +466,7 @@ inode_remove_user (struct inode *inode, bool in_use)
     {
       struct inode *in = inode_open (parent_sector);
       lock_acquire (&in->lock);
+      inode->dirty = true;
       in->data.user_cnt--;
       has_parent = in->data.has_parent;
       parent_sector = in->data.parent;

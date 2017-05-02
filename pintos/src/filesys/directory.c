@@ -360,9 +360,9 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
   struct inode *self_inode = inode_open (inode_sector);
   struct dir *self_dir = dir_open (self_inode);
 
-  inode_set_dir (inode_open (inode_sector), true);
+  // inode_set_dir (inode_open (inode_sector), true);
   /*Not sure why this one doesn't work, inode_disk doesn't seem to persist */
-  // inode_set_dir (self_inode, true);
+  inode_set_dir (self_inode, true);
 
   block_sector_t parent_sector = inode_get_inumber (dir_get_inode (dir));
   inode_set_parent(self_inode, parent_sector);
