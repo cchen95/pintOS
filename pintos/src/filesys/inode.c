@@ -186,6 +186,12 @@ inode_get_inumber (const struct inode *inode)
   return inode->sector;
 }
 
+int
+inode_get_open_cnt (const struct inode *inode)
+{
+  return inode->open_cnt;
+}
+
 /* Closes INODE and writes it to disk.
    If this was the last reference to INODE, frees its memory.
    If INODE was also a removed inode, frees its blocks. */
@@ -441,6 +447,7 @@ inode_add_user (struct inode *inode, bool in_use)
       has_parent = in->data.has_parent;
       parent_sector = in->data.parent;
       lock_release (&in->lock);
+
       inode_close(in);
     }
 }

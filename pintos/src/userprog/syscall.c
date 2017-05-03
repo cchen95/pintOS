@@ -132,7 +132,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         else
           {
             struct file_pointer *fn = get_file (args[1]);
-            if (fn == NULL)
+            if (fn == NULL || fn->is_dir)
               {
                 f->eax = -1;
                 break;
@@ -156,13 +156,13 @@ syscall_handler (struct intr_frame *f UNUSED)
           {
             struct file_pointer *fn = get_file (args[1]);
             if (fn == NULL || fn->is_dir)
-            {
-              f->eax = -1;
-              break;
-            }
-            inode_add_user(file_get_inode (fn->file), false);
+              {
+                f->eax = -1;
+                break;
+              }
+            inode_add_user (file_get_inode (fn->file), false);
             f->eax = file_write (fn->file, (void *) args[2], args[3]);
-            inode_remove_user(file_get_inode (fn->file), false);
+            inode_remove_user (file_get_inode (fn->file), false);
           }
         break;
       }
@@ -187,7 +187,34 @@ syscall_handler (struct intr_frame *f UNUSED)
         /* Locks in inode_close (), as well as dir_remove () */
         char filename[NAME_MAX + 1];
         struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
-        f->eax = filesys_dir_remove (dir, filename);
+        if (dir == NULL)
+          f->eax = filesys_remove ((char *) args[1]);
+        else
+          {
+            struct inode *inode;
+            bool found_dir = dir_lookup (dir, filename, &inode);
+            /* Also need to check open count */
+            if (!found_dir)
+              f->eax = false;
+            else
+            {
+              /* If not a directory, just remove from the directory and close file inode*/
+              if (!inode_is_dir (inode))
+                {
+                  f->eax = dir_remove (dir, filename);
+                  inode_close (inode);
+                }
+              else
+              {
+                struct dir *dir_to_remove = dir_open (inode);
+                if (!dir_is_empty (dir_to_remove))
+                  f->eax = false;
+                else
+                  f->eax = dir_remove (dir, filename);
+                dir_close(dir_to_remove);
+              }
+            }
+          }
         dir_close (dir);
         break;
       }
@@ -320,6 +347,23 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
     case SYS_READDIR:
       {
+        char filename[NAME_MAX + 1];
+        struct file_pointer *fp = get_file (args[1]);
+        struct dir *dir = dir_find (thread_current ()->wd, fp->name, filename);
+        if (dir == NULL)
+          {
+            f->eax = false;
+            break;
+          }
+        struct inode *inode;
+        bool found_dir = dir_lookup (dir, filename, &inode);
+        dir_close (dir);
+        if (!found_dir || !inode_is_dir (inode))
+          {
+            f->eax = false;
+            break;
+          }
+        f->eax =  dir_readdir (fp->dir, (char *) args[2]);
         break;
       }
     case SYS_ISDIR:

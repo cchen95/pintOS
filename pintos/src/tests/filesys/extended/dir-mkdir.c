@@ -12,4 +12,3 @@ test_main (void)
   CHECK (chdir ("a"), "chdir \"a\"");
   CHECK (open ("b") > 1, "open \"b\"");
 }
-

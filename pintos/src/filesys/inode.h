@@ -25,5 +25,5 @@ void inode_set_dir (struct inode *, bool is_dir);
 void inode_set_parent (struct inode *, block_sector_t parent_sector);
 void inode_add_user (struct inode *, bool in_use);
 void inode_remove_user (struct inode *, bool in_use);
-
+int inode_get_open_cnt (const struct inode *inode);
 #endif /* filesys/inode.h */

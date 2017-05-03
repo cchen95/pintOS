@@ -214,8 +214,11 @@ dir_remove (struct dir *dir, const char *name)
         }
     }
 
+  if (inode_get_open_cnt (inode) > 0)
+    goto done;
+
   /* Mark inode for deletion */
-  inode_add_user (inode, true) ;
+  // inode_add_user (inode, true) ;
 
   /* Erase directory entry. */
   e.in_use = false;
@@ -226,10 +229,10 @@ dir_remove (struct dir *dir, const char *name)
   inode_remove (inode);
 
   /* Unlock inode*/
-  inode_remove_user (inode, true);
   success = true;
 
  done:
+  // inode_remove_user (inode, true);
   inode_close (inode);
   return success;
 }
@@ -258,19 +261,19 @@ bool
 dir_is_empty (struct dir *dir)
 {
   struct dir_entry e;
-  off_t pos = 0;
+  off_t pos = 60;
 
   while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
     {
       if (e.in_use)
         {
-          if ((strcmp (e.name, "..") != 0) 
-            && (strcmp (e.name, ".") != 0))
+          if ((strcmp (e.name, "..") != 0)
+              && (strcmp (e.name, ".") != 0))
             return false;
         }
       pos += sizeof e;
     }
-  return false;
+  return true;
 }
 
 size_t
@@ -287,7 +290,7 @@ get_next_part (char part[NAME_MAX + 1], const char **srcp)
 {
   const char *src = *srcp;
   char *dst = part;
-  
+
   /* Skip leading slashes. If it’s all slashes, we’re done. */
   while (*src == '/')
     src++;
@@ -325,6 +328,12 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   struct dir *curr_dir, *old_dir = NULL;
   if (filepath == NULL)
     return NULL;
+  else if (strcmp (filepath, "/") == 0)
+    {
+      curr_dir = dir_open_root();
+      inode_set_dir (curr_dir->inode, true);
+      return curr_dir;
+    }
   else if (filepath[0] == '/')
     curr_dir = dir_open_root();
   else
@@ -366,7 +375,7 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
     }
 
   dir_close (curr_dir);
-  if (n == -1) 
+  if (n == -1)
     {
       dir_close (old_dir);
       return NULL;
@@ -387,7 +396,7 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
     {
       if (inode_sector != 0)
         free_map_release (inode_sector, 1);
-      return false; 
+      return false;
     }
 
   /* Add parent ".." and self "." directories, and set is_dir to true */
