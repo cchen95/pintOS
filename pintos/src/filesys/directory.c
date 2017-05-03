@@ -202,6 +202,21 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  /* Check if directory and if empty */
+  if (inode_is_dir (inode))
+    {
+      struct dir *dir = dir_open (inode);
+      if (!dir_is_empty (dir))
+        {
+          /* Close dir and opened inode */
+          dir_close (dir);
+          return false;
+        }
+    }
+
+  /* Mark inode for deletion */
+  inode_add_user (inode, true) ;
+
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
@@ -209,6 +224,9 @@ dir_remove (struct dir *dir, const char *name)
 
   /* Remove inode. */
   inode_remove (inode);
+
+  /* Unlock inode*/
+  inode_remove_user (inode, true);
   success = true;
 
  done:
@@ -247,7 +265,7 @@ dir_is_empty (struct dir *dir)
       if (e.in_use)
         {
           if ((strcmp (e.name, "..") != 0) 
-              || (strcmp (e.name, ".") != 0))
+            && (strcmp (e.name, ".") != 0))
             return false;
         }
       pos += sizeof e;
@@ -310,7 +328,7 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   else if (filepath[0] == '/')
     curr_dir = dir_open_root();
   else
-    curr_dir = dir_reopen(dir);
+    curr_dir = dir_reopen (dir);
 
   /* If case string is full of empty slashes*/
   old_dir = dir_reopen (curr_dir);
