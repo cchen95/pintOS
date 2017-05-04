@@ -203,6 +203,7 @@ syscall_handler (struct intr_frame *f UNUSED)
               if (!inode_is_dir (inode))
                 {
                   f->eax = dir_remove (dir, filename);
+                  inode_remove_user (inode, true);                  
                   inode_close (inode);
                 }
               else
@@ -213,9 +214,9 @@ syscall_handler (struct intr_frame *f UNUSED)
                   f->eax = false;
                 else
                   f->eax = dir_remove (dir, filename);
+                inode_remove_user (inode, true);
                 dir_close (dir_to_remove);
               }
-              inode_remove_user (inode, true);
             }
           }
         dir_close (dir);
