@@ -207,7 +207,9 @@ inode_close (struct inode *inode)
   if (--inode->open_cnt == 0)
     {
       /* Remove from inode list and release lock. */
+      lock_acquire (&inode_list_lock);
       list_remove (&inode->elem);
+      lock_release (&inode_list_lock);
 
       /* If dirty, write block metadata to disk*/
       if (inode->dirty)
