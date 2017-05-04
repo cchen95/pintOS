@@ -393,7 +393,7 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
   inode_set_dir (self_inode, true);
 
   block_sector_t parent_sector = inode_get_inumber (dir_get_inode (dir));
-  inode_set_parent(self_inode, parent_sector);
+  inode_set_parent (self_inode, parent_sector);
   success = (dir_add (self_dir, "..", parent_sector)
               && dir_add(self_dir, ".", inode_sector));
 

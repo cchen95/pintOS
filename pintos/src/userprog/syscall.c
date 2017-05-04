@@ -208,14 +208,11 @@ syscall_handler (struct intr_frame *f UNUSED)
               {
                 /* If directory, need to check inode open count and if is empty */
                 struct dir *dir_to_remove = dir_open (inode);
-                if (!dir_is_empty (dir_to_remove))
+                if (inode_get_open_cnt (inode) > 1 || !dir_is_empty (dir_to_remove))
                   f->eax = false;
                 else
-                  if (inode_get_open_cnt (inode) > 1)
-                    f->eax = false;
-                  else
-                    f->eax = dir_remove (dir, filename);
-                dir_close(dir_to_remove);
+                  f->eax = dir_remove (dir, filename);
+                dir_close (dir_to_remove);
               }
             }
           }
