@@ -206,11 +206,15 @@ syscall_handler (struct intr_frame *f UNUSED)
                 }
               else
               {
+                /* If directory, need to check inode open count and if is empty */
                 struct dir *dir_to_remove = dir_open (inode);
                 if (!dir_is_empty (dir_to_remove))
                   f->eax = false;
                 else
-                  f->eax = dir_remove (dir, filename);
+                  if (inode_get_open_cnt (inode) > 1)
+                    f->eax = false;
+                  else
+                    f->eax = dir_remove (dir, filename);
                 dir_close(dir_to_remove);
               }
             }
@@ -370,11 +374,9 @@ syscall_handler (struct intr_frame *f UNUSED)
       {
         struct file_pointer *fp = get_file (args[1]);
         if (fp == NULL || !fp->is_dir)
-          {
-            f->eax = false;
-            break;
-          }
-        f->eax = true;
+          f->eax = false;
+        else
+          f->eax = true;
         break;
       }
     case SYS_INUMBER:
@@ -387,10 +389,10 @@ syscall_handler (struct intr_frame *f UNUSED)
           }
         struct inode *inode = NULL;
         if (fp->is_dir)
-          inode = dir_get_inode(fp->dir);
+          inode = dir_get_inode (fp->dir);
         else
-          inode = file_get_inode(fp->file);
-        f->eax = inode_get_inumber(inode);
+          inode = file_get_inode (fp->file);
+        f->eax = inode_get_inumber (inode);
         break;
       }
   }
