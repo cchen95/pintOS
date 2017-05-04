@@ -27,7 +27,15 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  bool success = inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  if (!success || sector != ROOT_DIR_SECTOR)
+    return success;
+
+  /* Create self directories for root inode */
+  struct dir *root_dir = dir_open (inode_open (ROOT_DIR_SECTOR));
+  success = dir_add (root_dir, ".", ROOT_DIR_SECTOR);
+  dir_close (root_dir);
+  return success;
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -202,9 +210,6 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  if (inode_get_open_cnt (inode) > 0)
-    goto done;
-
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
@@ -215,6 +220,7 @@ dir_remove (struct dir *dir, const char *name)
   success = true;
 
  done:
+  // inode_remove_user (inode, true);
   inode_close (inode);
   return success;
 }
@@ -243,7 +249,7 @@ bool
 dir_is_empty (struct dir *dir)
 {
   struct dir_entry e;
-  off_t pos = 60;
+  off_t pos = 0;
 
   while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
     {
@@ -319,7 +325,7 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   else if (filepath[0] == '/')
     curr_dir = dir_open_root();
   else
-    curr_dir = dir_reopen(dir);
+    curr_dir = dir_reopen (dir);
 
   /* If case string is full of empty slashes*/
   old_dir = dir_reopen (curr_dir);
@@ -387,7 +393,7 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
   inode_set_dir (self_inode, true);
 
   block_sector_t parent_sector = inode_get_inumber (dir_get_inode (dir));
-  inode_set_parent(self_inode, parent_sector);
+  inode_set_parent (self_inode, parent_sector);
   success = (dir_add (self_dir, "..", parent_sector)
               && dir_add(self_dir, ".", inode_sector));
 

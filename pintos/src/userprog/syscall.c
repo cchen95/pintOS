@@ -184,20 +184,41 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
     case SYS_REMOVE:
       {
-        /* Locks in inode_close (), also need to do stuff in dir_remove() */
+        /* Locks in inode_close (), as well as dir_remove () */
         char filename[NAME_MAX + 1];
         struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
         if (dir == NULL)
-          f->eax = filesys_remove ((char *) args[1]);
+          f->eax = -1;
         else
           {
             struct inode *inode;
             bool found_dir = dir_lookup (dir, filename, &inode);
-            if (!found_dir || !inode_is_dir (inode) || !dir_is_empty (dir))
+            /* Also need to check open count */
+            if (!found_dir)
               f->eax = false;
             else
-              f->eax = dir_remove (dir, (char *) args[1]);
+            {
+              /* If not a directory, just remove from the directory and close file inode*/
+              inode_add_user (inode, true);
+              if (!inode_is_dir (inode))
+                {
+                  f->eax = dir_remove (dir, filename);
+                  inode_close (inode);
+                }
+              else
+              {
+                /* If directory, need to check inode open count and if is empty */
+                struct dir *dir_to_remove = dir_open (inode);
+                if (inode_get_open_cnt (inode) > 1 || !dir_is_empty (dir_to_remove))
+                  f->eax = false;
+                else
+                  f->eax = dir_remove (dir, filename);
+                dir_close (dir_to_remove);
+              }
+              inode_remove_user (inode, true);
+            }
           }
+        dir_close (dir);
         break;
       }
     case SYS_OPEN:
@@ -317,7 +338,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       {
         char filename[NAME_MAX + 1];
         struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
+        if (dir == NULL) {
+          f->eax = false;
+          break;
+        }
+        inode_add_user (dir_get_inode (dir), false);
         f->eax = dir_add_dir (dir, filename);
+        inode_remove_user (dir_get_inode (dir), false);
         dir_close (dir);
         break;
       }
@@ -346,11 +373,9 @@ syscall_handler (struct intr_frame *f UNUSED)
       {
         struct file_pointer *fp = get_file (args[1]);
         if (fp == NULL || !fp->is_dir)
-          {
-            f->eax = false;
-            break;
-          }
-        f->eax = true;
+          f->eax = false;
+        else
+          f->eax = true;
         break;
       }
     case SYS_INUMBER:
@@ -363,10 +388,10 @@ syscall_handler (struct intr_frame *f UNUSED)
           }
         struct inode *inode = NULL;
         if (fp->is_dir)
-          inode = dir_get_inode(fp->dir);
+          inode = dir_get_inode (fp->dir);
         else
-          inode = file_get_inode(fp->file);
-        f->eax = inode_get_inumber(inode);
+          inode = file_get_inode (fp->file);
+        f->eax = inode_get_inumber (inode);
         break;
       }
   }
