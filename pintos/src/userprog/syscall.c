@@ -199,6 +199,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             else
             {
               /* If not a directory, just remove from the directory and close file inode*/
+              inode_add_user (inode, true);
               if (!inode_is_dir (inode))
                 {
                   f->eax = dir_remove (dir, filename);
@@ -214,6 +215,7 @@ syscall_handler (struct intr_frame *f UNUSED)
                   f->eax = dir_remove (dir, filename);
                 dir_close (dir_to_remove);
               }
+              inode_remove_user (inode, true);
             }
           }
         dir_close (dir);
