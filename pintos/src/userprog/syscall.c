@@ -188,7 +188,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         char filename[NAME_MAX + 1];
         struct dir *dir = dir_find (thread_current ()->wd, (char *) args[1], filename);
         if (dir == NULL)
-          f->eax = filesys_remove ((char *) args[1]);
+          f->eax = -1;
         else
           {
             struct inode *inode;

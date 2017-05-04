@@ -202,24 +202,6 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  /* Check if directory and if empty */
-  if (inode_is_dir (inode))
-    {
-      struct dir *dir = dir_open (inode);
-      if (!dir_is_empty (dir))
-        {
-          /* Close dir and opened inode */
-          dir_close (dir);
-          return false;
-        }
-    }
-
-  if (inode_get_open_cnt (inode) > 0)
-    goto done;
-
-  /* Mark inode for deletion */
-  // inode_add_user (inode, true) ;
-
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
@@ -227,8 +209,6 @@ dir_remove (struct dir *dir, const char *name)
 
   /* Remove inode. */
   inode_remove (inode);
-
-  /* Unlock inode*/
   success = true;
 
  done:
@@ -261,7 +241,7 @@ bool
 dir_is_empty (struct dir *dir)
 {
   struct dir_entry e;
-  off_t pos = 60;
+  off_t pos = 0;
 
   while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
     {
