@@ -160,18 +160,21 @@ get_data (block_sector_t sector)
   return cb;
 }
 
-uint8_t *
-read_cache_block (block_sector_t sector)
+void
+read_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size)
 {
+  uint8_t *bounce = NULL;
   struct cache_block *cb = get_data (sector);
   if (cb == NULL)
     return NULL;
-  return cb->data;
+  bounce = cb->data;
+  memcpy (buffer, bounce + offset, size);
 }
 
-uint8_t *
-write_cache_block (block_sector_t sector)
+void
+write_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size)
 {
+  uint8_t *bounce = NULL;
   struct cache_block *cb = get_data (sector);
   if (cb == NULL)
     return NULL;
@@ -183,5 +186,6 @@ write_cache_block (block_sector_t sector)
   cb->dirty = 1;
 
   lock_release (&cb->block_lock);
-  return cb->data;
+  bounce = cb->data;
+  memcpy (bounce + offset, buffer, size);
 }
