@@ -162,11 +162,13 @@ inode_open (block_sector_t sector)
   inode->deny_write_cnt = 0;
   inode->removed = false;
   inode->dirty = false;
-  cond_init(&inode->cv);
-  lock_init(&inode->lock);
+  cond_init (&inode->cv);
+  lock_init (&inode->lock);
 
-  /* Move to cache */
-  block_read (fs_device, inode->sector, &inode->data);
+  if (inode->sector != FREE_MAP_SECTOR)
+    read_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
+  else
+    block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
 
@@ -213,7 +215,10 @@ inode_close (struct inode *inode)
 
       /* If dirty, write block metadata to disk*/
       if (inode->dirty)
-        block_write (fs_device, inode->sector, &inode->data);
+        if (inode->sector != FREE_MAP_SECTOR)
+          write_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
+        else
+          block_write (fs_device, inode->sector, &inode->data);
 
       /* Deallocate blocks if removed. */
       if (inode->removed)
@@ -222,12 +227,11 @@ inode_close (struct inode *inode)
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length));
         }
-      // inode_remove_user(inode, false);
       lock_release (&inode->lock);
       free (inode);
     }
   else
-    lock_release(&inode->lock);
+    lock_release (&inode->lock);
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -288,7 +292,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       // if (bounce == NULL)
       //   break;
       // memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
-      read_cache_block(sector_idx, buffer + bytes_read, sector_ofs, chunk_size);
+      read_cache_block (sector_idx, buffer + bytes_read, sector_ofs, chunk_size);
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
@@ -450,8 +454,7 @@ inode_add_user (struct inode *inode, bool in_use)
       has_parent = in->data.has_parent;
       parent_sector = in->data.parent;
       lock_release (&in->lock);
-
-      inode_close(in);
+      inode_close (in);
     }
 }
 
@@ -482,6 +485,6 @@ inode_remove_user (struct inode *inode, bool in_use)
       parent_sector = in->data.parent;
       cond_signal (&in->cv, &in->lock);
       lock_release (&in->lock);
-      inode_close(in);
+      inode_close (in);
     }
 }

@@ -32,7 +32,7 @@ bool dir_add_dir (struct dir *dir, char name[NAME_MAX + 1]);
 bool dir_is_empty (struct dir *);
 size_t num_dir_entries (void);
 
-/* Helper functions for extracting filenames and dirs from a filepath */
-struct dir *dir_find(struct dir *dir, const char *filepath, char filename[NAME_MAX + 1]);
+/* Helper function for extracting filename and dir from a filepath */
+struct dir *dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1]);
 
 #endif /* filesys/directory.h */

@@ -310,7 +310,7 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   if (strcmp (filepath, "") == 0)
     return NULL;
 
-  memset(filename, 0, NAME_MAX + 1);
+  memset (filename, 0, NAME_MAX + 1);
 
   /* Need to close curr_dir after looking through */
   struct dir *curr_dir, *old_dir = NULL;
@@ -318,12 +318,12 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
     return NULL;
   else if (strcmp (filepath, "/") == 0)
     {
-      curr_dir = dir_open_root();
+      curr_dir = dir_open_root ();
       inode_set_dir (curr_dir->inode, true);
       return curr_dir;
     }
   else if (filepath[0] == '/')
-    curr_dir = dir_open_root();
+    curr_dir = dir_open_root ();
   else
     curr_dir = dir_reopen (dir);
 
@@ -332,10 +332,10 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   struct inode *inode = NULL;
 
   int n;
-  while ((n = get_next_part(filename, &filepath)) == 1)
+  while ((n = get_next_part (filename, &filepath)) == 1)
     {
       dir_close (old_dir);
-      bool found_dir = dir_lookup(curr_dir, filename, &inode);
+      bool found_dir = dir_lookup (curr_dir, filename, &inode);
 
       /* If not found and no more parts return. filename is the file/dir to be created */
       if (!found_dir)
@@ -351,7 +351,7 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
         {
           if (get_next_part (filename, &filepath) != 0)
             {
-              dir_close(curr_dir);
+              dir_close (curr_dir);
               return NULL;
             }
           return curr_dir;
@@ -395,7 +395,7 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
   block_sector_t parent_sector = inode_get_inumber (dir_get_inode (dir));
   inode_set_parent (self_inode, parent_sector);
   success = (dir_add (self_dir, "..", parent_sector)
-              && dir_add(self_dir, ".", inode_sector));
+              && dir_add (self_dir, ".", inode_sector));
 
   dir_close (self_dir);
   return success;
