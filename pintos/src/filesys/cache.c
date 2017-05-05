@@ -93,7 +93,7 @@ find_cache_block (block_sector_t sector)
   for (e = list_begin (&cache_list); e != list_end (&cache_list);
        e = list_next (e))
     {
-      struct cache_block *cb = list_entry(e, struct cache_block, elem);
+      struct cache_block *cb = list_entry (e, struct cache_block, elem);
       if (cb->sector == sector)
         {
           lock_release (&cache_lock);
@@ -111,7 +111,7 @@ evict_block (struct cache_block *cb)
   lock_acquire (&cb->block_lock);
   if (cb->dirty)
     {
-      block_write(fs_device, cb->sector, cb->data);
+      block_write (fs_device, cb->sector, cb->data);
     }
   lock_release (&cb->block_lock);
 }

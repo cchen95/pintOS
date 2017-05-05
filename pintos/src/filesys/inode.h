@@ -19,11 +19,12 @@ off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
 void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
+int inode_get_open_cnt (const struct inode *inode);
+void inode_add_user (struct inode *, bool in_use);
+void inode_remove_user (struct inode *, bool in_use);
 
+/* Inode disk modifiers */
 bool inode_is_dir (struct inode *);
 void inode_set_dir (struct inode *, bool is_dir);
 void inode_set_parent (struct inode *, block_sector_t parent_sector);
-void inode_add_user (struct inode *, bool in_use);
-void inode_remove_user (struct inode *, bool in_use);
-int inode_get_open_cnt (const struct inode *inode);
 #endif /* filesys/inode.h */
