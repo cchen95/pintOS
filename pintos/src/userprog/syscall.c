@@ -276,7 +276,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         struct file_pointer *fn = get_file (args[1]);
         inode_add_user (file_get_inode (fn->file), true);
         f->eax = file_length (fn->file);
-        inode_remove_use (file_get_inode (fn->file), true);
+        inode_remove_user (file_get_inode (fn->file), true);
         break;
       }
     case SYS_SEEK:
@@ -298,14 +298,15 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_CLOSE:
       {
         if (args[1] == STDOUT_FILENO || args[1] == STDIN_FILENO)
-          {
             break;
-          }
+        
         struct file_pointer *fn = get_file (args[1]);
         if (fn == NULL)
           break;
-        // lock in inode_close ()
-        file_close (fn->file);
+        if (fn->is_dir)
+          dir_close (fn->dir);
+        else
+          file_close (fn->file);
         list_remove (&fn->elem);
         free (fn);
         break;
