@@ -296,20 +296,23 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     }
     case SYS_CLOSE:
-    {
-      if (args[1] == STDOUT_FILENO || args[1] == STDIN_FILENO)
-        {
+      {
+        if (args[1] == STDOUT_FILENO || args[1] == STDIN_FILENO)
+          {
+            break;
+          }
+        struct file_pointer *fn = get_file (args[1]);
+        if (fn == NULL)
           break;
-        }
-      struct file_pointer *fn = get_file (args[1]);
-      if (fn == NULL)
+        // lock in inode_close ()
+        if (fn->is_dir)
+          dir_close (fn->dir);
+        else
+          file_close (fn->file);
+        list_remove (&fn->elem);
+        free (fn);
         break;
-      // lock in inode_close ()
-      file_close (fn->file);
-      list_remove (&fn->elem);
-      free (fn);
-      break;
-    }
+      }
     case SYS_CHDIR:
       {
         char filename[NAME_MAX + 1];
