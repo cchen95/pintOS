@@ -607,6 +607,12 @@ inode_set_dir (struct inode *inode, bool is_dir)
   inode->data.is_dir = is_dir;
 }
 
+block_sector_t
+inode_get_parent (struct inode *inode)
+{
+  return inode->data.parent;
+}
+
 void
 inode_set_parent (struct inode *inode, block_sector_t parent_sector)
 {

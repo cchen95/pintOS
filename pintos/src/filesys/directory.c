@@ -133,6 +133,21 @@ dir_lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
+  struct inode *curr_inode = dir_get_inode (dir);
+  if (!strcmp (name, "."))
+  {
+    *inode = inode_reopen (curr_inode);
+    return *inode != NULL;
+  }
+
+  if (!strcmp (name, ".."))
+  {
+    if (inode_get_inumber (curr_inode) == ROOT_DIR_SECTOR)
+      return false;
+    *inode = inode_open (inode_get_parent (curr_inode));
+    return *inode != NULL;
+  }
+
   if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else

@@ -29,5 +29,6 @@ void inode_write_to_disk (struct inode *inode);
 /* Inode disk modifiers */
 bool inode_is_dir (struct inode *);
 void inode_set_dir (struct inode *, bool is_dir);
+block_sector_t inode_get_parent (struct inode *);
 void inode_set_parent (struct inode *, block_sector_t parent_sector);
 #endif /* filesys/inode.h */
