@@ -188,3 +188,10 @@ write_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size
   memcpy (bounce + offset, buffer, size);
   return bounce;
 }
+
+void cache_stats(int *hits, int *misses){
+  *hits = cache_hit;
+  *misses = cache_miss;
+  cache_hit = 0;
+  cache_miss = 0;
+}

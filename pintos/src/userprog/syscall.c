@@ -16,6 +16,7 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "threads/init.h"
+#include "filesys/cache.h"
 
 static void syscall_handler (struct intr_frame *);
 void check_ptr (void *ptr, size_t size);
@@ -386,5 +387,16 @@ syscall_handler (struct intr_frame *f UNUSED)
         f->eax = inode_get_inumber (inode);
         break;
       }
+    case SYS_CACHE_STAT:
+    {
+      int hits;
+      int misses;
+      cache_stats(&hits, &misses);
+      f->eax = fix_round(fix_mul(fix_div(fix_int(hits), fix_int(misses + hits)), fix_int(10000)));
+    }
+    case SYS_FREE_CACHE:
+    {
+      free_cache();
+    }
   }
 }
