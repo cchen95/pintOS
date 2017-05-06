@@ -25,6 +25,11 @@ static struct list cache_list;
 /* Lock for the cache. */
 struct lock cache_lock;
 
+/* Testing buffer cache's effectiveness */
+// might need lock for this
+size_t cache_hit;
+size_t cache_miss;
+
 /* Initializes the cache module. */
 void
 cache_init (void)
@@ -49,22 +54,8 @@ cache_init (void)
       list_push_front (&cache_list, &cb->elem);
     }
   lock_release (&cache_lock);
-}
-
-/* Initializes struct cache_block. */
-struct cache_block *
-init_cache_block (block_sector_t sector)
-{
-  struct cache_block *cb = malloc (sizeof (struct cache_block));
-  if (cb == NULL)
-    {
-      free (cb);
-      return NULL;
-    }
-  cb->dirty = 0;
-  cb->sector = sector;
-  lock_init (&cb->block_lock);
-  return cb;
+  cache_hit = 0;
+  cache_miss = 0;
 }
 
 void
@@ -81,6 +72,8 @@ free_cache (void)
       free (cb);
     }
   lock_release (&cache_lock);
+  cache_hit = 0;
+  cache_miss = 0;
 }
 
 /* Returns the cache_block that has sector number sector if it is in cache_list.
@@ -134,7 +127,10 @@ get_data (block_sector_t sector)
 {
   struct cache_block *cb = find_cache_block (sector);
   if (cb)
+    {
       update_lru (cb);
+      cache_hit++;
+    }
   if (!cb)
     {
       lock_acquire (&cache_lock);
@@ -156,11 +152,12 @@ get_data (block_sector_t sector)
       lock_acquire (&cache_lock);
       list_push_front (&cache_list, &cb->elem);
       lock_release (&cache_lock);
+      cache_miss++;
     }
   return cb;
 }
 
-void
+uint8_t *
 read_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size)
 {
   uint8_t *bounce = NULL;
@@ -169,9 +166,10 @@ read_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size)
     return NULL;
   bounce = cb->data;
   memcpy (buffer, bounce + offset, size);
+  return bounce;
 }
 
-void
+uint8_t *
 write_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size)
 {
   uint8_t *bounce = NULL;
@@ -188,4 +186,5 @@ write_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size
   lock_release (&cb->block_lock);
   bounce = cb->data;
   memcpy (bounce + offset, buffer, size);
+  return bounce;
 }

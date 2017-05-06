@@ -6,6 +6,7 @@
 #include "devices/block.h"
 
 struct bitmap;
+struct inode_disk;
 
 void inode_init (void);
 bool inode_create (block_sector_t, off_t);
@@ -22,7 +23,9 @@ off_t inode_length (const struct inode *);
 int inode_get_open_cnt (const struct inode *inode);
 void inode_add_user (struct inode *, bool in_use);
 void inode_remove_user (struct inode *, bool in_use);
-
+bool inode_allocate (size_t cnt, struct inode_disk *disk_inode);
+void inode_release (struct inode_disk *disk);
+void inode_write_to_disk (struct inode *inode);
 /* Inode disk modifiers */
 bool inode_is_dir (struct inode *);
 void inode_set_dir (struct inode *, bool is_dir);
