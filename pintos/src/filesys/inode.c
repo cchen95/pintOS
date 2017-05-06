@@ -166,7 +166,10 @@ inode_open (block_sector_t sector)
   lock_init(&inode->lock);
 
   /* Move to cache */
-  block_read (fs_device, inode->sector, &inode->data);
+  if (inode->sector != FREE_MAP_SECTOR)
+    read_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
+  else
+    block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
 
@@ -211,9 +214,15 @@ inode_close (struct inode *inode)
       list_remove (&inode->elem);
       lock_release (&inode_list_lock);
 
-      /* If dirty, write block metadata to disk*/
+      /* If dirty, write block metadata back */
       if (inode->dirty)
-        block_write (fs_device, inode->sector, &inode->data);
+        {
+          if (inode->sector != FREE_MAP_SECTOR)
+            write_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
+          else
+            block_write (fs_device, inode->sector, &inode->data);
+          
+        }
 
       /* Deallocate blocks if removed. */
       if (inode->removed)
