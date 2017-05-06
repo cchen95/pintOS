@@ -354,23 +354,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
     case SYS_READDIR:
       {
-        char filename[NAME_MAX + 1];
         struct file_pointer *fp = get_file (args[1]);
-        struct dir *dir = dir_find (thread_current ()->wd, fp->name, filename);
-        if (dir == NULL)
-          {
-            f->eax = false;
-            break;
-          }
-        struct inode *inode;
-        bool found_dir = dir_lookup (dir, filename, &inode);
-        dir_close (dir);
-        if (!found_dir || !inode_is_dir (inode))
-          {
-            f->eax = false;
-            break;
-          }
-        f->eax =  dir_readdir (fp->dir, (char *) args[2]);
+        if (fp == NULL || !fp->is_dir)
+          f->eax = false;
+        else
+          f->eax =  dir_readdir (fp->dir, (char *) args[2]);
         break;
       }
     case SYS_ISDIR:
