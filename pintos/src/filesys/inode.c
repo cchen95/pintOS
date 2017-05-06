@@ -342,9 +342,8 @@ inode_close (struct inode *inode)
       lock_release (&inode_list_lock);
 
       /* If dirty, write block metadata to disk*/
-      if (inode->dirty)
+      if (inode->dirty || inode->sector == FREE_MAP_SECTOR)
         write_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
-        // inode_write_to_disk (inode);
         // if (inode->sector != FREE_MAP_SECTOR)
         // else
         // block_write (fs_device, inode->sector, &inode->data);
@@ -353,6 +352,7 @@ inode_close (struct inode *inode)
       /* Deallocate blocks if removed. */
       if (inode->removed)
         {
+          // inode_write_to_disk (inode);
           free_map_release (inode->sector, 1);
           inode_release (&inode->data);
           // free_map_release (*inode->data.direct,
@@ -449,13 +449,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
   uint8_t *bounce = NULL;
-
-  int test = 0;
-  if (offset == 61440)
-    {
-      test += 1;
-      test += 1;
-    }
 
   while (size > 0)
     {

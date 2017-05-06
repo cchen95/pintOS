@@ -49,7 +49,7 @@ cache_init (void)
           return;
         }
       cb->dirty = 0;
-      cb->sector = 0;
+      cb->sector = -1;
       lock_init (&cb->block_lock);
       list_push_front (&cache_list, &cb->elem);
     }

@@ -38,8 +38,8 @@ filesys_init (bool format)
 void
 filesys_done (void)
 {
-  free_cache ();
   free_map_close ();
+  free_cache ();
 }
 
 /* Creates a file named NAME with the given INITIAL_SIZE.
@@ -101,7 +101,7 @@ filesys_open_dir (struct dir *dir, const char *name)
 
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
-  
+
   return file_open (inode);
 }
 
