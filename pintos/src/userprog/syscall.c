@@ -203,7 +203,7 @@ syscall_handler (struct intr_frame *f UNUSED)
               if (!inode_is_dir (inode))
                 {
                   f->eax = dir_remove (dir, filename);
-                  inode_remove_user (inode, true);                  
+                  inode_remove_user (inode, true);
                   inode_close (inode);
                 }
               else
@@ -298,11 +298,13 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_CLOSE:
       {
         if (args[1] == STDOUT_FILENO || args[1] == STDIN_FILENO)
+          {
             break;
-        
+          }
         struct file_pointer *fn = get_file (args[1]);
         if (fn == NULL)
           break;
+        // lock in inode_close ()
         if (fn->is_dir)
           dir_close (fn->dir);
         else
