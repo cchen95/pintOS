@@ -344,6 +344,9 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   int n;
   while ((n = get_next_part (filename, &filepath)) == 1)
     {
+      if (strcmp (filename, "") == 0)
+        continue;
+      
       dir_close (old_dir);
       bool found_dir = dir_lookup (curr_dir, filename, &inode);
 
