@@ -31,10 +31,10 @@ dir_create (block_sector_t sector, size_t entry_cnt)
   if (!success || sector != ROOT_DIR_SECTOR)
     return success;
 
-  /* Create self directories for root inode */
-  struct dir *root_dir = dir_open (inode_open (ROOT_DIR_SECTOR));
-  success = dir_add (root_dir, ".", ROOT_DIR_SECTOR);
-  dir_close (root_dir);
+  /* Set root_dir directory to true */
+  struct inode *root_inode = inode_open (ROOT_DIR_SECTOR);
+  inode_set_dir (root_inode, true);
+  inode_close (root_inode);
   return success;
 }
 
@@ -176,11 +176,6 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
 
-  /* Check that NAME is not in use. */
-  // if (lookup (dir, name, NULL, NULL))
-  //   goto done;
-
-
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
      current end-of-file.
@@ -200,6 +195,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 
   if (found)
     goto done;
+  
   /* Write slot. */
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
@@ -259,9 +255,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
       dir->pos += sizeof e;
-      if (e.in_use
-          && (strcmp (e.name, "..") != 0)
-          && (strcmp (e.name, ".") != 0))
+      if (e.in_use)
         {
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;
@@ -341,18 +335,12 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   struct dir *curr_dir, *old_dir = NULL;
   if (filepath == NULL)
     return NULL;
-  else if (strcmp (filepath, "/") == 0)
-    {
-      curr_dir = dir_open_root ();
-      inode_set_dir (curr_dir->inode, true);
-      return curr_dir;
-    }
   else if (filepath[0] == '/')
     curr_dir = dir_open_root ();
   else
     curr_dir = dir_reopen (dir);
 
-  /* If case string is full of empty slashes*/
+  /* If case string is full of empty slashes */
   old_dir = dir_reopen (curr_dir);
   struct inode *inode = NULL;
 
@@ -415,16 +403,11 @@ dir_add_dir (struct dir *dir, char name[NAME_MAX + 1])
       return false;
     }
 
-  /* Add parent ".." and self "." directories, and set is_dir to true */
+  /* Add parent sector to inode and set is_dir to true */
   struct inode *self_inode = inode_open (inode_sector);
-  struct dir *self_dir = dir_open (self_inode);
   inode_set_dir (self_inode, true);
-
   block_sector_t parent_sector = inode_get_inumber (dir_get_inode (dir));
   inode_set_parent (self_inode, parent_sector);
-  success = (dir_add (self_dir, "..", parent_sector)
-              && dir_add (self_dir, ".", inode_sector));
-
-  dir_close (self_dir);
+  inode_close (self_inode);
   return success;
 }
