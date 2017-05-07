@@ -47,5 +47,7 @@ bool isdir (int fd);
 int inumber (int fd);
 int cache_hit_rate(void);
 void free_cache(void);
+int cache_reads(void);
+int cache_writes(void);
 
 #endif /* lib/user/syscall.h */
