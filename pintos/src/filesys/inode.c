@@ -338,8 +338,10 @@ inode_close (struct inode *inode)
 
       /* If dirty, write block metadata to disk*/
       if (inode->dirty)
-        write_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
-        inode_write_to_disk (inode);
+        {
+          write_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
+          inode_write_to_disk (inode);
+        }
 
       /* Deallocate blocks if removed. */
       if (inode->removed)
@@ -374,10 +376,10 @@ inode_write_to_disk (struct inode *inode)
       read_cache_block (disk->doubly_indirect, &doubly_indirect, 0, BLOCK_SECTOR_SIZE);
       size_t i;
       for (i = 0; i < NUM_PTRS_IN_BLOCK; i++)
-      {
-        read_cache_block (doubly_indirect->data[i], &indirect, 0, BLOCK_SECTOR_SIZE);
-        block_write (fs_device, doubly_indirect->data[i], &indirect);
-      }
+        {
+          read_cache_block (doubly_indirect->data[i], &indirect, 0, BLOCK_SECTOR_SIZE);
+          block_write (fs_device, doubly_indirect->data[i], &indirect);
+        }
       free (doubly_indirect);
     }
 }
@@ -394,11 +396,11 @@ inode_release (struct inode_disk *disk)
   if (disk->indirect != 0)
     {
       for (i = 0; i < NUM_PTRS_IN_BLOCK; i++)
-      {
-        read_cache_block (disk->indirect, &indirect, 0, BLOCK_SECTOR_SIZE);
-        if (indirect.data[i] != 0)
-          free_map_release (indirect.data[i], 1);
-      }
+        {
+          read_cache_block (disk->indirect, &indirect, 0, BLOCK_SECTOR_SIZE);
+          if (indirect.data[i] != 0)
+            free_map_release (indirect.data[i], 1);
+        }
     }
 
   if (disk->doubly_indirect != 0)
@@ -408,14 +410,14 @@ inode_release (struct inode_disk *disk)
       read_cache_block (disk->doubly_indirect, doubly_indirect, 0, BLOCK_SECTOR_SIZE);
       size_t j;
       for (i = 0; i < NUM_PTRS_IN_BLOCK; i++)
-      {
-        read_cache_block (doubly_indirect->data[i], &indirect, 0, BLOCK_SECTOR_SIZE);
-        for (j = 0; j < NUM_PTRS_IN_BLOCK; j++)
-          {
-            if (indirect.data[j] != 0)
-              free_map_release (indirect.data[j], 1);
-          }
-      }
+        {
+          read_cache_block (doubly_indirect->data[i], &indirect, 0, BLOCK_SECTOR_SIZE);
+          for (j = 0; j < NUM_PTRS_IN_BLOCK; j++)
+            {
+              if (indirect.data[j] != 0)
+                free_map_release (indirect.data[j], 1);
+            }
+        }
       free (doubly_indirect);
     }
 }

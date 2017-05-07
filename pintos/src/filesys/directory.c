@@ -31,7 +31,7 @@ dir_create (block_sector_t sector, size_t entry_cnt)
   if (!success || sector != ROOT_DIR_SECTOR)
     return success;
 
-  /* Set root_dir directory to true */
+  /* Set root_dir is_dir to true */
   struct inode *root_inode = inode_open (ROOT_DIR_SECTOR);
   inode_set_dir (root_inode, true);
   inode_close (root_inode);
@@ -135,20 +135,14 @@ dir_lookup (const struct dir *dir, const char *name,
 
   struct inode *curr_inode = dir_get_inode (dir);
   if (!strcmp (name, "."))
-  {
     *inode = inode_reopen (curr_inode);
-    return *inode != NULL;
-  }
-
-  if (!strcmp (name, ".."))
-  {
-    if (inode_get_inumber (curr_inode) == ROOT_DIR_SECTOR)
-      return false;
-    *inode = inode_open (inode_get_parent (curr_inode));
-    return *inode != NULL;
-  }
-
-  if (lookup (dir, name, &e, NULL))
+  else if (!strcmp (name, ".."))
+    {
+      if (inode_get_inumber (curr_inode) == ROOT_DIR_SECTOR)
+        return false;
+      *inode = inode_open (inode_get_parent (curr_inode));
+    }
+  else if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else
     *inode = NULL;
@@ -271,11 +265,7 @@ dir_is_empty (struct dir *dir)
   while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
     {
       if (e.in_use)
-        {
-          if ((strcmp (e.name, "..") != 0)
-              && (strcmp (e.name, ".") != 0))
-            return false;
-        }
+        return false;
       pos += sizeof e;
     }
   return true;
