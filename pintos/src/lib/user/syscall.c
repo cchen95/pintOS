@@ -200,3 +200,13 @@ free_cache(void)
 {
   syscall0 (SYS_FREE_CACHE);
 }
+
+int cache_reads(void)
+{
+  return syscall0(SYS_CACHE_READS);
+}
+
+int cache_writes(void)
+{
+  return syscall0(SYS_CACHE_WRITES);
+}

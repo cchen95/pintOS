@@ -21,7 +21,15 @@ test_main(void){
 	// 	read(fd, buffer, 512);
 	// int second_hit_rate = cache_hit_rate();
 	// close(fd);
-	int first_hit_rate = 20;
-	int second_hit_rate = 30;
+
+	create("a", 10000);
+	char buffer[512];
+	int fd = open("a");
+	read(fd, buffer, 512);
+	int first_hit_rate = cache_hit_rate();
+	close(fd);
+	fd = open("a");
+	read(fd, buffer, 512);
+	int second_hit_rate = cache_hit_rate();
 	second_hit_rate >= first_hit_rate ? msg("Hit rate increases") : msg("Hit rate decreases");
 }

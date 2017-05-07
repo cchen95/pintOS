@@ -17,6 +17,8 @@
 #include "devices/input.h"
 #include "threads/init.h"
 #include "filesys/cache.h"
+#include <threads/fixed-point.h>
+#include "devices/block.h"
 
 static void syscall_handler (struct intr_frame *);
 void check_ptr (void *ptr, size_t size);
@@ -373,10 +375,22 @@ syscall_handler (struct intr_frame *f UNUSED)
       int misses;
       cache_stats(&hits, &misses);
       f->eax = fix_round(fix_mul(fix_div(fix_int(hits), fix_int(misses + hits)), fix_int(10000)));
+      break;
     }
     case SYS_FREE_CACHE:
     {
       free_cache();
+      break;
+    }
+    case SYS_CACHE_READS:
+    {
+      f->eax = device_read_cnt(fs_device);
+      break;
+    }
+    case SYS_CACHE_WRITES:
+    {
+      f->eax = device_write_cnt(fs_device);
+      break;
     }
   }
 }
