@@ -34,25 +34,25 @@ syscall_init (void)
 void
 check_ptr (void *ptr, size_t size)
 {
-  if (is_user_vaddr (ptr) && pagedir_get_page (thread_current ()->pagedir, ptr) != NULL && is_user_vaddr (ptr + size) && pagedir_get_page (thread_current ()->pagedir, ptr + size) != NULL)
-  {
+  if (is_user_vaddr (ptr)
+      && pagedir_get_page (thread_current ()->pagedir, ptr) != NULL
+      && is_user_vaddr (ptr + size)
+      && pagedir_get_page (thread_current ()->pagedir, ptr + size) != NULL)
     return;
-  }
   else
-  {
     thread_exit ();
-  }
 }
 
 void
 check_string (char *ustr)
 {
-  if (is_user_vaddr (ustr)) {
-    char *kstr = pagedir_get_page (thread_current ()->pagedir, ustr);
-    if (kstr != NULL && is_user_vaddr (ustr + strlen (kstr) + 1) &&
-      pagedir_get_page (thread_current ()->pagedir, (ustr + strlen (kstr) + 1)) != NULL)
-      return;
-  }
+  if (is_user_vaddr (ustr))
+    {
+      char *kstr = pagedir_get_page (thread_current ()->pagedir, ustr);
+      if (kstr != NULL && is_user_vaddr (ustr + strlen (kstr) + 1)
+          && pagedir_get_page (thread_current ()->pagedir, (ustr + strlen (kstr) + 1)) != NULL)
+        return;
+    }
   thread_exit ();
 }
 
@@ -62,11 +62,11 @@ get_file (int fd)
   struct list *list_ = &thread_current ()->file_list;
   struct list_elem *e = list_head (list_);
   while ((e = list_next (e)) != list_tail (list_))
-  {
-    struct file_pointer *f = list_entry (e, struct file_pointer, elem);
-    if (f->fd == fd)
-    return f;
-  }
+    {
+      struct file_pointer *f = list_entry (e, struct file_pointer, elem);
+      if (f->fd == fd)
+      return f;
+    }
   return NULL;
 }
 
@@ -86,14 +86,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_ptr (&args[1], sizeof (uint32_t));
   }
 
-  if (args[0] == SYS_EXEC || args[0] == SYS_CREATE || args[0] ==  SYS_REMOVE || args[0] == SYS_OPEN)
-  {
+  if (args[0] == SYS_EXEC || args[0] == SYS_CREATE 
+      || args[0] ==  SYS_REMOVE || args[0] == SYS_OPEN)
     check_string ((char *) args[1]);
-  }
   else if (args[0] == SYS_WRITE || args[0] == SYS_READ)
-  {
     check_ptr ((void *) args[2], args[3]);
-  }
 
   switch (args[0]) {
     case SYS_PRACTICE:
@@ -370,27 +367,27 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
       }
     case SYS_CACHE_STAT:
-    {
-      int hits;
-      int misses;
-      cache_stats(&hits, &misses);
-      f->eax = fix_round(fix_mul(fix_div(fix_int(hits), fix_int(misses + hits)), fix_int(10000)));
-      break;
-    }
+      {
+        int hits, misses;
+        cache_stats (&hits, &misses);
+        f->eax = fix_round (fix_mul (fix_div (fix_int (hits), fix_int (misses + hits)), 
+                                     fix_int (10000)));
+        break;
+      }
     case SYS_FREE_CACHE:
-    {
-      free_cache();
-      break;
-    }
+      {
+        free_cache ();
+        break;
+      }
     case SYS_CACHE_READS:
-    {
-      f->eax = device_read_cnt(fs_device);
-      break;
-    }
+      {
+        f->eax = device_read_cnt (fs_device);
+        break;
+      }
     case SYS_CACHE_WRITES:
-    {
-      f->eax = device_write_cnt(fs_device);
-      break;
-    }
+      {
+        f->eax = device_write_cnt (fs_device);
+        break;
+      }
   }
 }

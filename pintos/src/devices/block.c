@@ -179,13 +179,13 @@ block_print_stats (void)
 }
 
 unsigned long
-device_read_cnt(struct block *block_device)
+device_read_cnt (struct block *block_device)
 {
   return block_device->read_cnt;
 }
 
 unsigned long
-device_write_cnt(struct block *block_device)
+device_write_cnt (struct block *block_device)
 {
   return block_device->write_cnt;
 }
