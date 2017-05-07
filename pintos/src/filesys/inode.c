@@ -12,7 +12,7 @@
 #include <stdio.h>
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define NUM_DIRECT_PTRS 120
+#define NUM_DIRECT_PTRS 122
 #define NUM_PTRS_IN_BLOCK 128
 
 /* On-disk inode.
@@ -25,9 +25,7 @@ struct inode_disk
     off_t length;                            /* File size in bytes. */
     unsigned magic;                          /* Magic number. */
     int is_dir;
-    int has_parent;
     block_sector_t parent;
-    int user_cnt;
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -48,7 +46,6 @@ struct inode
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
     struct lock lock;                   /* Lock */
-    struct condition cv;                /* Condition variable */
     bool dirty;
   };
 
@@ -141,8 +138,6 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
-      disk_inode->user_cnt = 0;
-      disk_inode->has_parent = false;
       disk_inode->is_dir = false;
       if (inode_allocate (sectors, disk_inode))
         {
@@ -289,7 +284,6 @@ inode_open (block_sector_t sector)
   inode->deny_write_cnt = 0;
   inode->removed = false;
   inode->dirty = false;
-  cond_init (&inode->cv);
   lock_init (&inode->lock);
 
   // if (inode->sector != FREE_MAP_SECTOR)
@@ -344,7 +338,7 @@ inode_close (struct inode *inode)
       lock_release (&inode_list_lock);
 
       /* If dirty, write block metadata to disk*/
-      if (inode->dirty || inode->sector == FREE_MAP_SECTOR)
+      if (inode->dirty)
         write_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
         // if (inode->sector != FREE_MAP_SECTOR)
         // else
@@ -619,84 +613,5 @@ void
 inode_set_parent (struct inode *inode, block_sector_t parent_sector)
 {
   inode->dirty = true;
-  inode->data.has_parent = true;
   inode->data.parent = parent_sector;
-}
-
-void
-inode_add_user (struct inode *inode, bool in_use)
-{
-  /* Whole file operation, there should be 0 users to continue*/
-  if (in_use)
-    {
-      lock_acquire (&inode->lock);
-      while (inode->data.user_cnt != 0)
-        cond_wait (&inode->cv, &inode->lock);
-      inode->dirty = true;
-      inode->data.user_cnt = -1;
-      lock_release (&inode->lock);
-    }
-
-  /* Go through parents and increment number of sub users */
-  bool has_parent = inode->data.has_parent;
-  block_sector_t parent_sector = inode->data.parent;
-
-  while (has_parent)
-    {
-      struct inode *in = inode_open (parent_sector);
-      lock_acquire (&in->lock);
-      /* Should not have whole file operation on parent to continue*/
-      while (in->data.user_cnt < 0)
-        cond_wait (&in->cv, &in->lock);
-      inode->dirty = true;
-      in->data.user_cnt++;
-      has_parent = in->data.has_parent;
-      parent_sector = in->data.parent;
-      lock_release (&in->lock);
-      inode_close (in);
-    }
-}
-
-void
-inode_remove_user (struct inode *inode, bool in_use)
-{
-  /* If current inode in use, no other process could have used it
-     so just reset user_cnt to 0
-  */
-  if (in_use)
-    {
-      lock_acquire (&inode->lock);
-      inode->dirty = true;
-      inode->data.user_cnt = 0;
-      cond_signal (&inode->cv, &inode->lock);
-      lock_release (&inode->lock);
-    }
-
-  bool has_parent = inode->data.has_parent;
-  block_sector_t parent_sector = inode->data.parent;
-  while (has_parent)
-    {
-      struct inode *in = inode_open (parent_sector);
-      lock_acquire (&in->lock);
-      inode->dirty = true;
-      in->data.user_cnt--;
-      has_parent = in->data.has_parent;
-      parent_sector = in->data.parent;
-      cond_signal (&in->cv, &in->lock);
-      lock_release (&in->lock);
-      inode_close (in);
-    }
-}
-
-void
-inode_acquire_lock (struct inode *inode)
-{
-  ASSERT (inode != NULL);
-  lock_acquire (&inode->lock);
-}
-
-void inode_release_lock (struct inode *inode)
-{
-  ASSERT (inode != NULL);
-  lock_release (&inode->lock);
 }
