@@ -286,8 +286,8 @@ inode_open (block_sector_t sector)
   inode->dirty = false;
   lock_init (&inode->lock);
 
+  /* Read inode_disk data */
   read_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
-
   return inode;
 }
 
@@ -454,6 +454,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       int chunk_size = size < min_left ? size : min_left;
       if (chunk_size <= 0)
         break;
+
       bounce = read_cache_block (sector_idx, buffer + bytes_read, sector_ofs, chunk_size);
       if (bounce == NULL)
         break;

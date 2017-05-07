@@ -24,6 +24,7 @@ int inode_get_open_cnt (const struct inode *inode);
 bool inode_allocate (size_t cnt, struct inode_disk *disk_inode);
 void inode_release (struct inode_disk *disk);
 void inode_write_to_disk (struct inode *inode);
+
 /* Inode disk modifiers */
 bool inode_is_dir (struct inode *);
 void inode_set_dir (struct inode *, bool is_dir);

@@ -345,9 +345,6 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
   int n;
   while ((n = get_next_part (filename, &filepath)) == 1)
     {
-      if (strcmp (filename, "") == 0)
-        continue;
-      
       dir_close (old_dir);
       bool found_dir = dir_lookup (curr_dir, filename, &inode);
 
@@ -356,7 +353,11 @@ dir_find (struct dir *dir, const char *filepath, char filename[NAME_MAX + 1])
         {
           if (get_next_part (filename, &filepath) == 0)
             return curr_dir;
-          return NULL;
+          else
+            {
+              dir_close (curr_dir);
+              return NULL;
+            }
         }
 
       /* If found entry, need to check if entry is file or directory

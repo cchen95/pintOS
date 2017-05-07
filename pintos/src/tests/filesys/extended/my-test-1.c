@@ -7,29 +7,14 @@
 
 void
 test_main(void){
-	// create("a", 10000);
-	// free_cache();
-	// int fd = open("a");
-	// char buffer[512];
-	// int i;
-	// for (i = 0; i < 10000 / 512; ++i)
-	// 	read(fd, buffer, 512);
-	// int first_hit_rate = cache_hit_rate();
-	// close(fd);
-	// fd = open("a");
-	// for (i = 0; i < 10000 / 512; ++i)
-	// 	read(fd, buffer, 512);
-	// int second_hit_rate = cache_hit_rate();
-	// close(fd);
-
-	create("a", 10000);
+	create ("a", 10000);
 	char buffer[512];
-	int fd = open("a");
-	read(fd, buffer, 512);
-	int first_hit_rate = cache_hit_rate();
-	close(fd);
-	fd = open("a");
-	read(fd, buffer, 512);
-	int second_hit_rate = cache_hit_rate();
-	second_hit_rate >= first_hit_rate ? msg("Hit rate increases") : msg("Hit rate decreases");
+	int fd = open ("a");
+	read (fd, buffer, 512);
+	int first_hit_rate = cache_hit_rate ();
+	close (fd);
+	fd = open ("a");
+	read (fd, buffer, 512);
+	int second_hit_rate = cache_hit_rate ();
+	second_hit_rate >= first_hit_rate ? msg ("Hit rate increases") : msg ("Hit rate decreases");
 }
