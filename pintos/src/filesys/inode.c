@@ -201,6 +201,7 @@ inode_allocate (size_t cnt, struct inode_disk *disk_inode)
     }
   write_cache_block (disk_inode->indirect, &indirect, 0, BLOCK_SECTOR_SIZE);
 
+
   struct indirect_block *doubly_indirect;
   doubly_indirect = calloc (1, sizeof (struct indirect_block));
   if (disk_inode->doubly_indirect == 0)
@@ -220,7 +221,7 @@ inode_allocate (size_t cnt, struct inode_disk *disk_inode)
       read_cache_block (doubly_indirect->data[i], &indirect, 0, BLOCK_SECTOR_SIZE);
       for (j = 0; j < NUM_PTRS_IN_BLOCK; j++)
         {
-          if (&indirect.data[j] == 0)
+          if (indirect.data[j] == 0)
             {
               if (free_map_allocate (1, &indirect.data[j]))
                 {
@@ -232,11 +233,13 @@ inode_allocate (size_t cnt, struct inode_disk *disk_inode)
             }
           if (cnt == 0)
             {
-              write_cache_block (disk_inode->doubly_indirect, &doubly_indirect, 0, BLOCK_SECTOR_SIZE);
+              write_cache_block (doubly_indirect->data[i], &indirect, 0, BLOCK_SECTOR_SIZE);
+              write_cache_block (disk_inode->doubly_indirect, doubly_indirect, 0, BLOCK_SECTOR_SIZE);
               free (doubly_indirect);
               return true;
             }
         }
+        write_cache_block (doubly_indirect->data[i], &indirect, 0, BLOCK_SECTOR_SIZE);
     }
   free (doubly_indirect);
   return false;
@@ -336,6 +339,7 @@ inode_close (struct inode *inode)
       /* If dirty, write block metadata to disk*/
       if (inode->dirty)
         write_cache_block (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
+        inode_write_to_disk (inode);
 
       /* Deallocate blocks if removed. */
       if (inode->removed)
@@ -434,6 +438,13 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
   uint8_t *bounce = NULL;
+
+  int test = 0;
+  if (offset == 61440)
+    {
+      test += 1;
+      test += 1;
+    }
 
   while (size > 0)
     {
