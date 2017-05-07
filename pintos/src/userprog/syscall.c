@@ -138,9 +138,7 @@ syscall_handler (struct intr_frame *f UNUSED)
                 f->eax = -1;
                 break;
               }
-            inode_add_user (file_get_inode (fn->file), false)  ;
             f->eax = file_read (fn->file, (void *) args[2], args[3]);
-            inode_remove_user (file_get_inode (fn->file), false);
           }
         break;
       }
@@ -161,9 +159,7 @@ syscall_handler (struct intr_frame *f UNUSED)
                 f->eax = -1;
                 break;
               }
-            inode_add_user (file_get_inode (fn->file), false);
             f->eax = file_write (fn->file, (void *) args[2], args[3]);
-            inode_remove_user (file_get_inode (fn->file), false);
           }
         break;
       }
@@ -176,10 +172,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = false;
             break;
           }
-        inode_add_user (dir_get_inode (dir), false);
         f->eax = filesys_create_dir (dir, filename, args[2]);
-        inode_remove_user (dir_get_inode (dir), false);
-
         dir_close (dir);
         break;
       }
@@ -200,11 +193,9 @@ syscall_handler (struct intr_frame *f UNUSED)
             else
             {
               /* If not a directory, just remove from the directory and close file inode*/
-              inode_add_user (inode, true);
               if (!inode_is_dir (inode))
-                {
+                { 
                   f->eax = dir_remove (dir, filename);
-                  inode_remove_user (inode, true);
                   inode_close (inode);
                 }
               else
@@ -215,7 +206,6 @@ syscall_handler (struct intr_frame *f UNUSED)
                   f->eax = false;
                 else
                   f->eax = dir_remove (dir, filename);
-                inode_remove_user (inode, true);
                 dir_close (dir_to_remove);
               }
             }
@@ -246,7 +236,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         dir_close (dir);
         if (found)
           {
-            inode_add_user (inode, false);
             struct file_pointer *fp = malloc (sizeof (struct file_pointer));
             struct thread *t = thread_current ();
             if (inode_is_dir (inode))
@@ -264,7 +253,6 @@ syscall_handler (struct intr_frame *f UNUSED)
             fp->fd = t->next_fd++;
             list_push_back (&t->file_list, &fp->elem);
             f->eax = fp->fd;
-            inode_remove_user (inode, false);
           }
         else
           {
@@ -275,25 +263,19 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_FILESIZE:
       {
         struct file_pointer *fn = get_file (args[1]);
-        inode_add_user (file_get_inode (fn->file), true);
         f->eax = file_length (fn->file);
-        inode_remove_user (file_get_inode (fn->file), true);
         break;
       }
     case SYS_SEEK:
       {
         struct file_pointer *fn = get_file (args[1]);
-        inode_add_user (file_get_inode (fn->file), false);
         file_seek (fn->file, args[2]);
-        inode_remove_user (file_get_inode (fn->file), false);
         break;
       }
     case SYS_TELL:
       {
         struct file_pointer *fn = get_file (args[1]);
-        inode_add_user (file_get_inode (fn->file), false);
         f->eax = file_tell (fn->file);
-        inode_remove_user (file_get_inode (fn->file), false);
         break;
       }
     case SYS_CLOSE:
@@ -305,7 +287,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         struct file_pointer *fn = get_file (args[1]);
         if (fn == NULL)
           break;
-        // lock in inode_close ()
+        /* locks in inode_close ()*/
         if (fn->is_dir)
           dir_close (fn->dir);
         else
@@ -347,9 +329,7 @@ syscall_handler (struct intr_frame *f UNUSED)
           f->eax = false;
           break;
         }
-        inode_add_user (dir_get_inode (dir), false);
         f->eax = dir_add_dir (dir, filename);
-        inode_remove_user (dir_get_inode (dir), false);
         dir_close (dir);
         break;
       }

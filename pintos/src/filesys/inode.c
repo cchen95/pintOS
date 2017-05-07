@@ -305,7 +305,9 @@ struct inode *
 inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
+    lock_acquire (&inode->lock);
     inode->open_cnt++;
+    lock_release (&inode->lock);
   return inode;
 }
 
@@ -607,6 +609,12 @@ inode_set_dir (struct inode *inode, bool is_dir)
   inode->data.is_dir = is_dir;
 }
 
+block_sector_t
+inode_get_parent (struct inode *inode)
+{
+  return inode->data.parent;
+}
+
 void
 inode_set_parent (struct inode *inode, block_sector_t parent_sector)
 {
@@ -678,4 +686,17 @@ inode_remove_user (struct inode *inode, bool in_use)
       lock_release (&in->lock);
       inode_close (in);
     }
+}
+
+void
+inode_acquire_lock (struct inode *inode)
+{
+  ASSERT (inode != NULL);
+  lock_acquire (&inode->lock);
+}
+
+void inode_release_lock (struct inode *inode)
+{
+  ASSERT (inode != NULL);
+  lock_release (&inode->lock);
 }
