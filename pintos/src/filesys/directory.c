@@ -195,7 +195,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 
   if (found)
     goto done;
-  
+
   /* Write slot. */
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
@@ -239,7 +239,6 @@ dir_remove (struct dir *dir, const char *name)
   success = true;
 
  done:
-  // inode_remove_user (inode, true);
   inode_close (inode);
   return success;
 }
@@ -251,7 +250,6 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
-
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
       dir->pos += sizeof e;

@@ -305,7 +305,9 @@ struct inode *
 inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
+    lock_acquire (&inode->lock);
     inode->open_cnt++;
+    lock_release (&inode->lock);
   return inode;
 }
 
@@ -684,4 +686,17 @@ inode_remove_user (struct inode *inode, bool in_use)
       lock_release (&in->lock);
       inode_close (in);
     }
+}
+
+void
+inode_acquire_lock (struct inode *inode)
+{
+  ASSERT (inode != NULL);
+  lock_acquire (&inode->lock);
+}
+
+void inode_release_lock (struct inode *inode)
+{
+  ASSERT (inode != NULL);
+  lock_release (&inode->lock);
 }
