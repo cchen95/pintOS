@@ -74,7 +74,7 @@ start_process (void *file_name_)
   bool success;
 
   size_t function_size = strlen (file_name) + 1;
-  char **argv = malloc(64*sizeof(char*));
+  char **argv = malloc (64*sizeof (char*));
   size_t argc = 0;
   char *save_ptr;
 
@@ -103,7 +103,7 @@ start_process (void *file_name_)
     thread_exit ();
 
   if_.esp -= function_size;
-  memcpy(if_.esp, file_name_, function_size);
+  memcpy (if_.esp, file_name_, function_size);
 
   size_t argv_sz = (argc + 1) * sizeof (char *);
 
@@ -191,6 +191,8 @@ process_exit (void)
       struct list_elem *e = list_pop_front (&cur->children);
       free (list_entry (e, struct childProc, elem));
     }
+
+  /* Close open files and dirs */  
   while (!list_empty (&cur->file_list))
     {
       struct list_elem *e = list_pop_front (&cur->file_list);
@@ -202,7 +204,8 @@ process_exit (void)
       free (f);
     }
 
-  dir_close(cur->wd);
+  /* Close working directory */  
+  dir_close (cur->wd);
 
   printf ("%s: exit(%d)\n", (char *) &cur->name, cur->proc->exit_status);
   sema_up (&cur->proc->sema);
