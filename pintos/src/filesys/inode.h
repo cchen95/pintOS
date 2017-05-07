@@ -21,13 +21,12 @@ void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 int inode_get_open_cnt (const struct inode *inode);
-void inode_add_user (struct inode *, bool in_use);
-void inode_remove_user (struct inode *, bool in_use);
 bool inode_allocate (size_t cnt, struct inode_disk *disk_inode);
 void inode_release (struct inode_disk *disk);
 void inode_write_to_disk (struct inode *inode);
 /* Inode disk modifiers */
 bool inode_is_dir (struct inode *);
 void inode_set_dir (struct inode *, bool is_dir);
+block_sector_t inode_get_parent (struct inode *);
 void inode_set_parent (struct inode *, block_sector_t parent_sector);
 #endif /* filesys/inode.h */

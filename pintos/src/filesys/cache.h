@@ -15,4 +15,7 @@ uint8_t* write_cache_block (block_sector_t sector, void *buffer, off_t offset, o
 void free_cache (void);
 struct cache_block *get_data (block_sector_t sector);
 
+//testing
+void cache_stats(int *hits, int *misses);
+
 #endif /* filesys/cache.h */
