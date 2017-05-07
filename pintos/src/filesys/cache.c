@@ -189,7 +189,8 @@ write_cache_block (block_sector_t sector, void *buffer, off_t offset, off_t size
   return bounce;
 }
 
-void cache_stats(int *hits, int *misses){
+void cache_stats(int *hits, int *misses)
+{
   *hits = cache_hit;
   *misses = cache_miss;
   cache_hit = 0;
