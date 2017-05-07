@@ -24,8 +24,8 @@ struct inode_disk
     block_sector_t doubly_indirect;          /* Doubly indirect pointer. */
     off_t length;                            /* File size in bytes. */
     unsigned magic;                          /* Magic number. */
-    int is_dir;
-    block_sector_t parent;
+    int is_dir;                              /* True if inode is a directory. */
+    block_sector_t parent;                   /* Sector of parent inode. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -72,32 +72,32 @@ byte_to_sector (const struct inode *inode, off_t pos)
         return inode->data.direct[offset];
       max += NUM_PTRS_IN_BLOCK;
       if (offset < max)
-      {
-        /* Get block data from cache. */
-        struct indirect_block *indirect;
-        indirect = calloc (1, sizeof (struct indirect_block));
-        read_cache_block (inode->data.indirect, indirect, 0, BLOCK_SECTOR_SIZE);
+        {
+          /* Get block data from cache. */
+          struct indirect_block *indirect;
+          indirect = calloc (1, sizeof (struct indirect_block));
+          read_cache_block (inode->data.indirect, indirect, 0, BLOCK_SECTOR_SIZE);
 
-        block = indirect->data[offset - NUM_DIRECT_PTRS];
-        free (indirect);
-        return block;
-      }
+          block = indirect->data[offset - NUM_DIRECT_PTRS];
+          free (indirect);
+          return block;
+        }
       max += NUM_PTRS_IN_BLOCK * NUM_PTRS_IN_BLOCK;
       if (offset < max)
-      {
-        /* Same as indirect except read from cache twice. */
-        struct indirect_block *indirect;
-        indirect = calloc (1, sizeof (struct indirect_block));
-        read_cache_block (inode->data.doubly_indirect, indirect, 0, BLOCK_SECTOR_SIZE);
+        {
+          /* Same as indirect except read from cache twice. */
+          struct indirect_block *indirect;
+          indirect = calloc (1, sizeof (struct indirect_block));
+          read_cache_block (inode->data.doubly_indirect, indirect, 0, BLOCK_SECTOR_SIZE);
 
-        off_t index1 = (offset - (NUM_PTRS_IN_BLOCK + NUM_DIRECT_PTRS)) / NUM_PTRS_IN_BLOCK;
-        off_t index2 = (offset - (NUM_PTRS_IN_BLOCK + NUM_DIRECT_PTRS)) % NUM_PTRS_IN_BLOCK;
-        read_cache_block (indirect->data[index1], indirect, 0, BLOCK_SECTOR_SIZE);
+          off_t index1 = (offset - (NUM_PTRS_IN_BLOCK + NUM_DIRECT_PTRS)) / NUM_PTRS_IN_BLOCK;
+          off_t index2 = (offset - (NUM_PTRS_IN_BLOCK + NUM_DIRECT_PTRS)) % NUM_PTRS_IN_BLOCK;
+          read_cache_block (indirect->data[index1], indirect, 0, BLOCK_SECTOR_SIZE);
 
-        block = indirect->data[index2];
-        free (indirect);
-        return block;
-      }
+          block = indirect->data[index2];
+          free(indirect);
+          return block;
+        }
     }
   return -1;
 }
@@ -201,7 +201,7 @@ inode_allocate (size_t cnt, struct inode_disk *disk_inode)
     }
   write_cache_block (disk_inode->indirect, &indirect, 0, BLOCK_SECTOR_SIZE);
 
-
+  /* Doubly indirect */
   struct indirect_block *doubly_indirect;
   doubly_indirect = calloc (1, sizeof (struct indirect_block));
   if (disk_inode->doubly_indirect == 0)
@@ -253,8 +253,6 @@ inode_open (block_sector_t sector)
 {
   struct list_elem *e;
   struct inode *inode;
-
-  /* Need to check cache first? */
 
   /* Check whether this inode is already open. */
   lock_acquire (&inode_list_lock);
@@ -440,13 +438,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
   uint8_t *bounce = NULL;
-
-  int test = 0;
-  if (offset == 61440)
-    {
-      test += 1;
-      test += 1;
-    }
 
   while (size > 0)
     {
